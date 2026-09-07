@@ -1014,8 +1014,16 @@ function updateHUD(){
 // 입력 (key-state map)
 // ════════════════════════════════════════════════════════════════════
 const keys = {};
-window.addEventListener('keydown', e=>{ keys[e.code]=true; e.preventDefault(); });
-window.addEventListener('keyup',   e=>{ keys[e.code]=false; });
+window.addEventListener('keydown', e=>{
+  const t = e.target;
+  if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable)) return;
+  keys[e.code]=true; e.preventDefault();
+});
+window.addEventListener('keyup', e=>{
+  const t = e.target;
+  if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable)) return;
+  keys[e.code]=false;
+});
 
 // ════════════════════════════════════════════════════════════════════
 // 오디오
