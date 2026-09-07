@@ -807,7 +807,7 @@ const UPGRADE_SWORDSMAN = [
 const UPGRADE_ARCHER = [
   { id:'bow_spd',    name:'속사',       desc:'발사 속도 +35%',          apply: p=>{ p.arrowRate *= 1.35; } },
   { id:'bow_dmg',    name:'철촉',       desc:'화살 피해 +35%',          apply: p=>{ p.arrowDmg *= 1.35; } },
-  { id:'bow_spread', name:'산탄',       desc:'화살 +2발 부채꼴 발사',   apply: p=>{ p.arrowSpreadCount = Math.min(5, p.arrowSpreadCount + 2); } },
+  { id:'bow_spread', name:'산탄',       desc:'화살 +1발 부채꼴 발사',   apply: p=>{ p.arrowSpreadCount = Math.min(5, p.arrowSpreadCount + 1); } },
 ];
 
 function getUpgradePool(){
@@ -2654,22 +2654,28 @@ function updateArcherCombat(dt){
   p.arrowTimer -= dt;
   if(p.arrowTimer > 0) return;
 
-  // 4방향 직선 탐지: 각도 0, π/2, π, 3π/2 (우/하/좌/상)
-  const dirs = [0, Math.PI/2, Math.PI, Math.PI*3/2];
-  let bestDir = null, bestDist = Infinity, bestTarget = null;
-  for(const dir of dirs){
-    for(const z of gs.zombies){
-      if(z.dead) continue;
-      const dx = z.x - p.x, dy = z.y - p.y;
-      const dist = Math.hypot(dx, dy);
-      if(dist > 600) continue;
-      const zAngle = Math.atan2(dy, dx);
-      let delta = zAngle - dir;
-      while(delta >  Math.PI) delta -= Math.PI*2;
-      while(delta < -Math.PI) delta += Math.PI*2;
-      if(Math.abs(delta) > ARROW_CONE) continue;
-      if(dist < bestDist){ bestDist = dist; bestDir = dir; bestTarget = z; }
-    }
+  // 발사 방향: 이동 중이면 수평 이동 방향, 정지 시 캐릭터 전면(facingRight)
+  // 상하 방향은 발사 불가 — 오직 좌/우만
+  const movingRight  = p.vx >  30;
+  const movingLeft   = p.vx < -30;
+  let fireDir; // 0 = 우, Math.PI = 좌
+  if(movingRight)       fireDir = 0;
+  else if(movingLeft)   fireDir = Math.PI;
+  else                  fireDir = p.facingRight ? 0 : Math.PI;
+
+  // 발사 방향 원뿔(±15°) 안에 좀비가 있어야 발사
+  let bestDist = Infinity, bestTarget = null;
+  for(const z of gs.zombies){
+    if(z.dead) continue;
+    const dx = z.x - p.x, dy = z.y - p.y;
+    const dist = Math.hypot(dx, dy);
+    if(dist > 620) continue;
+    const zAngle = Math.atan2(dy, dx);
+    let delta = zAngle - fireDir;
+    while(delta >  Math.PI) delta -= Math.PI*2;
+    while(delta < -Math.PI) delta += Math.PI*2;
+    if(Math.abs(delta) > ARROW_CONE) continue;
+    if(dist < bestDist){ bestDist = dist; bestTarget = z; }
   }
 
   if(!bestTarget){
@@ -2677,24 +2683,28 @@ function updateArcherCombat(dt){
     return;
   }
 
-  // 화살 발사 (산탄 포함)
-  const spread = p.arrowSpreadCount;
-  const spreadStep = (spread > 1) ? (Math.PI * 12/180) : 0; // ±12° 간격
-  const halfSpan = spreadStep * Math.floor(spread / 2);
-  const baseAngle = Math.atan2(bestTarget.y - p.y, bestTarget.x - p.x);
-  if(Math.cos(baseAngle) >= 0) p.facingRight = true;
-  else p.facingRight = false;
+  // 발사 방향 고정 (수평 순수 각도)
+  const baseAngle = fireDir;
+  p.facingRight = (fireDir === 0);
 
+  // 화살 발사 — 몸 중심(발 기준 -52px)에서 출발
+  const originY = p.y - 52;
+  const spread = p.arrowSpreadCount;
+  // 산탄: 홀수 발 기준 ±14° 간격. 발 수가 짝수면 ±7° 부터 시작
+  const spreadStep = Math.PI * 14 / 180;
+  const halfOdd = Math.floor(spread / 2);
   for(let i = 0; i < spread; i++){
-    const offset = -halfSpan + spreadStep * i;
-    const ang = baseAngle + offset;
+    // 홀수: -N,-N+1,...,0,...,N  / 짝수: -N+0.5,...,0.5,...,N-0.5
+    const idx = i - (spread - 1) / 2;
+    const ang = baseAngle + spreadStep * idx;
     gs.arrows.push({
-      x: p.x, y: p.y,
+      x: p.x, y: originY,
       vx: Math.cos(ang) * p.arrowSpeed,
       vy: Math.sin(ang) * p.arrowSpeed,
       dmg: p.arrowDmg * p.atkMult,
       angle: ang,
       life: 2.0,
+      trail: [], // 잔상 포인트
     });
   }
 
@@ -2710,18 +2720,21 @@ function updateArrows(dt){
     const a = gs.arrows[i];
     a.life -= dt;
     if(a.life <= 0){ gs.arrows.splice(i,1); continue; }
+    // 잔상 기록 (매 프레임 현재 위치 저장, 최대 8점)
+    if(!a.trail) a.trail = [];
+    a.trail.unshift({ x: a.x, y: a.y });
+    if(a.trail.length > 8) a.trail.pop();
+
     a.x += a.vx * dt;
     a.y += a.vy * dt;
     if(a.x < -80 || a.x > MAP_W+80 || a.y < -80 || a.y > PLAY_H+80){
       gs.arrows.splice(i,1); continue;
     }
     // 좀비 충돌 검사
-    let hit = false;
     for(const z of gs.zombies){
       if(z.dead) continue;
       const dx = z.x - a.x, dy = z.y - a.y;
-      if(Math.hypot(dx,dy) > z.radius + 6) continue;
-      // 명중
+      if(Math.hypot(dx,dy) > z.radius + 8) continue;
       const isCrit = Math.random() < (0.06 + p.critChance);
       let dmg = a.dmg + (Math.random()*4-2);
       if(isCrit) dmg *= 2.2;
@@ -2731,7 +2744,7 @@ function updateArrows(dt){
       if(p.lifesteal > 0) p.hp = Math.min(p.maxHp, p.hp + dmg * p.lifesteal);
       if(p.fireDmg > 0) z.fireTimer = Math.max(z.fireTimer, 3.0);
       z.hitFlash = 1;
-      const nb = 80 * p.knockbackMult * (1 - z.def.knockbackRes);
+      const nb = 90 * p.knockbackMult * (1 - z.def.knockbackRes);
       const nd = Math.max(0.01, Math.hypot(dx,dy));
       z.knockVx += (dx/nd)*nb; z.knockVy += (dy/nd)*nb;
       spawnHitImpact(a.x, a.y, a.angle, isCrit);
@@ -2741,7 +2754,6 @@ function updateArrows(dt){
       gs.hitStop = isCrit ? 0.04 : 0.01;
       if(z.hp <= 0) killZombie(z);
       gs.arrows.splice(i,1);
-      hit = true;
       break;
     }
   }
@@ -2751,25 +2763,86 @@ function drawArrows(){
   if(!gs.arrows || !gs.arrows.length) return;
   ctx.save();
   for(const a of gs.arrows){
-    const len = 22, headLen = 7;
     const cos = Math.cos(a.angle), sin = Math.sin(a.angle);
-    const tx = a.x + cos*len*0.5, ty = a.y + sin*len*0.5;
-    const bx = a.x - cos*len*0.5, by = a.y - sin*len*0.5;
-    // 화살대
+
+    // ── 잔상 트레일 (에너지 흔적) ─────────────────────────────────
+    if(a.trail && a.trail.length > 1){
+      for(let t = 0; t < a.trail.length - 1; t++){
+        const alpha = (1 - t / a.trail.length) * 0.55;
+        const w = (1 - t / a.trail.length) * 3.5;
+        ctx.beginPath();
+        ctx.moveTo(a.trail[t].x, a.trail[t].y);
+        ctx.lineTo(a.trail[t+1].x, a.trail[t+1].y);
+        ctx.strokeStyle = `rgba(120,210,255,${alpha})`;
+        ctx.lineWidth = w;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+    }
+
+    // ── 화살 몸체 (발광 외곽 + 코어) ──────────────────────────────
+    const shaftLen = 26;
+    const tailX = a.x - cos * shaftLen, tailY = a.y - sin * shaftLen;
+
+    // 외곽 글로우
     ctx.beginPath();
-    ctx.moveTo(bx, by);
-    ctx.lineTo(tx, ty);
-    ctx.strokeStyle = '#c8a060';
-    ctx.lineWidth = 2.5;
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(a.x, a.y);
+    const glowGrad = ctx.createLinearGradient(tailX, tailY, a.x, a.y);
+    glowGrad.addColorStop(0, 'rgba(80,180,255,0)');
+    glowGrad.addColorStop(1, 'rgba(180,240,255,0.6)');
+    ctx.strokeStyle = glowGrad;
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
     ctx.stroke();
-    // 화살촉
+
+    // 코어 화살대 (나무 색)
     ctx.beginPath();
-    ctx.moveTo(tx, ty);
-    ctx.lineTo(tx - cos*headLen + sin*headLen*0.45, ty - sin*headLen - cos*headLen*0.45);
-    ctx.lineTo(tx - cos*headLen - sin*headLen*0.45, ty - sin*headLen + cos*headLen*0.45);
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(a.x, a.y);
+    const shaftGrad = ctx.createLinearGradient(tailX, tailY, a.x, a.y);
+    shaftGrad.addColorStop(0, '#8b5e2a');
+    shaftGrad.addColorStop(1, '#d4a84b');
+    ctx.strokeStyle = shaftGrad;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // 깃털 (꼬리)
+    ctx.save();
+    ctx.translate(tailX, tailY);
+    ctx.rotate(a.angle);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-8,  4);
+    ctx.lineTo(-5,  0);
+    ctx.lineTo(-8, -4);
     ctx.closePath();
-    ctx.fillStyle = '#e0d080';
+    ctx.fillStyle = 'rgba(255,255,200,0.75)';
     ctx.fill();
+    ctx.restore();
+
+    // ── 화살촉 (삼각 + 발광) ──────────────────────────────────────
+    const headLen = 10;
+    const tipX = a.x + cos * headLen, tipY = a.y + sin * headLen;
+    // 발광 후광
+    const tipGlow = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, 11);
+    tipGlow.addColorStop(0, 'rgba(200,240,255,0.85)');
+    tipGlow.addColorStop(1, 'rgba(80,180,255,0)');
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 11, 0, Math.PI*2);
+    ctx.fillStyle = tipGlow;
+    ctx.fill();
+    // 촉 삼각형
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - cos*headLen + sin*5, tipY - sin*headLen - cos*5);
+    ctx.lineTo(tipX - cos*headLen - sin*5, tipY - sin*headLen + cos*5);
+    ctx.closePath();
+    ctx.fillStyle = '#d8f4ff';
+    ctx.fill();
+    ctx.strokeStyle = '#60c8ff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
   ctx.restore();
 }
