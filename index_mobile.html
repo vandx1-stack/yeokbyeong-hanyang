@@ -2525,10 +2525,10 @@ function performSlash(p, angle){
     gs.screen.shakeX = isCrit ? 5 : 2;
     gs.screen.shakeY = isCrit ? 3 : 1;
     gs.hitStop = isCrit ? 0.04 : 0.015;
+    try { sndHwando(isCrit); } catch(e){}
 
     if(z.hp <= 0) killZombie(z);
   }
-  try { sndHwando(false); } catch(e){}
 }
 
 function updateSwordHits(){
