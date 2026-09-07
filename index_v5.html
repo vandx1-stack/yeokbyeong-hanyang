@@ -533,8 +533,8 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
       <div><span class="sclbl">최대 콤보</span><span class="scval" id="sccombo">0</span></div>
     </div>
     <div class="scbonus" id="scbonus">+0 보너스 점수</div>
-    <div class="scnxt">다음 스테이지 준비 중...</div>
     <div class="scwarn" id="scwarn"></div>
+    <button class="tbtn" id="btn-next-stage" style="margin-top:12px;">다음 스테이지 ▶</button>
     <div class="panel-rule"></div>
   </div>
 </div>
@@ -2378,8 +2378,6 @@ function tick(ts){
     else if(phase === 'playing' && _paused){ /* 일시정지 중 — 스킵 */ }
     else if(phase === 'stageclear'){
       if(gs){ updateParticles(dt); updateDmgNumbers(dt); updateScreen(dt); }
-      scAutoTimer -= dt;
-      if(scAutoTimer <= 0) nextStage();
     }
     draw();
   } catch(e) {
@@ -3598,7 +3596,6 @@ function stageClear(){
   document.getElementById('scwarn').textContent = nextWarn;
 
   showPanel('sc');
-  scAutoTimer = 4.0; // 4초 후 자동 다음 스테이지
 }
 
 function nextStage(){
@@ -3673,7 +3670,7 @@ window.addEventListener('keydown', e=>{
   }
   if(phase==='title' && e.code==='Space'){ initGame(); } // Space 단축키 유지
   if(phase==='gameover' && e.code==='Space'){ initGame(); }
-  if(phase==='stageclear' && e.code==='Space'){ scAutoTimer = 0; }
+  if(phase==='stageclear' && e.code==='Space'){ nextStage(); }
 });
 // 타이틀 버튼 (click + touchend 모두 등록 — 터치 300ms 딜레이 제거)
 function _bindBtn(id, fn){
@@ -3723,6 +3720,7 @@ _bindBtn('btn-start', showCharacterSelect);
 _bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} showTitleRanking(); });
 _bindBtn('btn-rank-back', hideTitleRanking);
 _bindBtn('btn-go-home', goToTitle);
+_bindBtn('btn-next-stage', nextStage);
 _bindBtn('btn-cs-back', goToTitle);
 (function(){
   const btn = document.getElementById('pause-home-btn');
