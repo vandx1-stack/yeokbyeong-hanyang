@@ -808,13 +808,15 @@ function onTouchStart(e){
     document.body.classList.add('touch-device');
   }
   _audio();
-  for(const t of e.changedTouches){
-    const g = clientToGame(t.clientX, t.clientY);
-    if(g.y < PLAY_H){
-      touchTarget.active = true;
-      touchTarget.x = g.x;
-      touchTarget.y = g.y;
-      break;
+  if(phase === 'playing'){
+    for(const t of e.changedTouches){
+      const g = clientToGame(t.clientX, t.clientY);
+      if(g.y < PLAY_H){
+        touchTarget.active = true;
+        touchTarget.x = g.x;
+        touchTarget.y = g.y;
+        break;
+      }
     }
   }
 }
@@ -2060,7 +2062,20 @@ let stageTimer = STAGE_DURATION;
 let scAutoTimer = 0; // 스테이지 클리어 자동 진행 타이머
 let stageKillsStart = 0; // 스테이지 시작 시 kills 카운트
 
+// 화면 꺼짐 방지 (Wake Lock API)
+let _wakeLock = null;
+async function _acquireWakeLock(){
+  if(!('wakeLock' in navigator)) return;
+  try { _wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+}
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState === 'visible' && phase === 'playing'){
+    try { _wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+  }
+});
+
 function initGame(){
+  _acquireWakeLock();
   try { BGM.stage(); } catch(e){ console.warn('BGM.stage failed:', e); }
   gameTime = 0;
   stage = 1;
@@ -3513,6 +3528,9 @@ function pickUpgrade(idx){
   phase = 'playing';
   levelupChoices = [];
   hideAllPanels();
+  // 메뉴 탭 좌표로 이동하지 않도록 터치 목표 초기화
+  touchTarget.active = false;
+  touchInput.dx = 0; touchInput.dy = 0;
 }
 
 // 키 입력
