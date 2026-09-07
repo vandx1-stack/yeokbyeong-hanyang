@@ -443,7 +443,20 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
   <div class="tbtnwrap">
     <button class="tbtn" id="btn-start">시  작</button>
     <button class="tbtn" id="btn-rank">랭  킹</button>
-    <div class="tbtn" id="title-nick" style="cursor:default;opacity:0.7;font-size:11px;letter-spacing:1px;pointer-events:none;text-align:center;justify-content:center;"></div>
+    <div class="tbtn" id="title-nick" style="cursor:pointer;opacity:0.75;font-size:11px;letter-spacing:1px;text-align:center;justify-content:center;" title="클릭하여 닉네임 변경"></div>
+    <div id="title-nick-edit" style="display:none;flex-direction:column;align-items:center;gap:6px;">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input id="title-nick-input" type="text" maxlength="10" placeholder="닉네임 (최대 10자)"
+          style="background:rgba(30,10,0,0.85);border:1px solid rgba(180,90,20,0.6);color:#e0c080;
+                 padding:5px 10px;font-size:11px;border-radius:2px;width:130px;font-family:inherit;
+                 outline:none;text-align:center;
+                 user-select:text;-webkit-user-select:text;touch-action:auto;">
+        <button id="title-nick-save"
+          style="background:rgba(100,40,5,0.85);border:1px solid rgba(180,90,20,0.6);
+                 color:#d4a020;padding:5px 12px;font-size:11px;border-radius:2px;
+                 cursor:pointer;font-family:inherit;white-space:nowrap;">확인</button>
+      </div>
+    </div>
   </div>
   <div class="tctl">화면 <b>드래그</b> 이동 · <b>자동</b> 공격</div>
   <div id="ath-hint" style="display:none;margin-top:8px;font-size:9px;color:#8a6030;letter-spacing:0.5px;text-align:center;line-height:1.5;">
@@ -3652,6 +3665,43 @@ function _bindBtn(id, fn){
   el.addEventListener('touchend', e=>{ e.preventDefault(); e.stopPropagation(); fn(); });
 }
 _updateTitleNick();
+
+// 타이틀 닉네임 변경
+(function(){
+  const nickDisplay = document.getElementById('title-nick');
+  const nickEdit    = document.getElementById('title-nick-edit');
+  const nickInput   = document.getElementById('title-nick-input');
+  const nickSave    = document.getElementById('title-nick-save');
+  if(!nickDisplay || !nickEdit) return;
+
+  function openEdit(){
+    nickDisplay.style.display = 'none';
+    nickEdit.style.display    = 'flex';
+    nickInput.value = localStorage.getItem('hanyang_name') || '';
+    nickInput.focus();
+    nickInput.select();
+  }
+  function saveEdit(){
+    const n = nickInput.value.trim().slice(0,10) || '익명';
+    _setPlayerName(n);
+    _updateTitleNick();
+    nickEdit.style.display    = 'none';
+    nickDisplay.style.display = '';
+  }
+
+  nickDisplay.addEventListener('click',    e => { e.stopPropagation(); openEdit(); });
+  nickDisplay.addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); openEdit(); });
+  nickSave.addEventListener('click',    e => { e.stopPropagation(); saveEdit(); });
+  nickSave.addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); saveEdit(); });
+  nickInput.addEventListener('keydown', e => { if(e.key==='Enter') saveEdit(); });
+  nickInput.addEventListener('click',       e => e.stopPropagation());
+  nickInput.addEventListener('touchstart',  e => e.stopPropagation(), {passive:false});
+  nickInput.addEventListener('pointerdown', e => e.stopPropagation());
+  nickEdit.addEventListener('click',       e => e.stopPropagation());
+  nickEdit.addEventListener('touchstart',  e => e.stopPropagation(), {passive:false});
+  nickEdit.addEventListener('pointerdown', e => e.stopPropagation());
+})();
+
 _bindBtn('btn-start', showCharacterSelect);
 _bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} showTitleRanking(); });
 _bindBtn('btn-rank-back', hideTitleRanking);
