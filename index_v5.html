@@ -350,12 +350,17 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 #pause-overlay{position:absolute;top:10px;left:50%;transform:translateX(-50%);
   background:linear-gradient(180deg,rgba(14,7,1,0.90),rgba(8,4,1,0.95));
   border:1px solid rgba(120,60,12,0.6);border-radius:4px;
-  padding:7px 24px;pointer-events:none;z-index:299;
+  padding:7px 24px 10px;pointer-events:auto;z-index:299;
   box-shadow:0 2px 20px rgba(0,0,0,.7),inset 0 1px 0 rgba(200,110,20,.08);}
 #pause-overlay.hid{display:none!important;}
 #pause-overlay .ptxt{font-size:13px;font-weight:700;color:#f0c050;letter-spacing:6px;
   font-family:'Noto Serif KR',serif;text-shadow:0 0 14px rgba(255,160,30,0.7);}
 #pause-overlay .presume{font-size:8px;color:#806030;letter-spacing:2px;text-align:center;margin-top:2px;animation:blt 2s ease infinite alternate;}
+#pause-home-btn{display:block;margin:8px auto 0;width:100px;padding:5px 0;
+  background:rgba(50,15,2,0.9);border:1px solid rgba(120,60,12,0.7);border-radius:2px;
+  color:#a07030;font-size:9px;letter-spacing:3px;cursor:pointer;font-family:inherit;
+  transition:color .12s,border-color .12s;}
+#pause-home-btn:hover{color:#f0c050;border-color:rgba(200,110,20,.8);}
 </style>
 </head>
 <body>
@@ -392,6 +397,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 <div id="pause-overlay" class="hid">
   <div class="ptxt">일시정지</div>
   <div class="presume">⏸ 버튼을 다시 눌러 계속</div>
+  <button id="pause-home-btn">메인화면</button>
 </div>
 
 <!-- HUD -->
@@ -461,6 +467,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
     <div class="panel-rule"></div>
     <div class="cs-tit">캐릭터 선택</div>
     <div class="cs-sub">그대의 무기를 택하시오</div>
+    <button class="tbtn go-home-btn" id="btn-cs-back" style="margin-bottom:8px;">← 뒤로</button>
     <div class="cs-grid">
       <div class="cs-card" data-char="priest">
         <div class="cs-portrait"><canvas class="cs-portrait-cv" width="88" height="88" data-src="player"></canvas></div>
@@ -3637,6 +3644,14 @@ _bindBtn('btn-start', showCharacterSelect);
 _bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} showTitleRanking(); });
 _bindBtn('btn-rank-back', hideTitleRanking);
 _bindBtn('btn-go-home', goToTitle);
+_bindBtn('btn-cs-back', goToTitle);
+(function(){
+  const btn = document.getElementById('pause-home-btn');
+  if(!btn) return;
+  const goHome = (e) => { e.preventDefault(); e.stopPropagation(); _setPause(false); goToTitle(); };
+  btn.addEventListener('click',    goHome);
+  btn.addEventListener('touchend', goHome);
+})();
 
 
 // 캐릭터 선택 화면
