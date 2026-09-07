@@ -419,7 +419,10 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
     <button class="tbtn" id="btn-start">시  작</button>
     <button class="tbtn" id="btn-rank">랭  킹</button>
   </div>
-  <div class="tctl">화면 <b>왼쪽 드래그</b> 이동 · <b>자동</b> 공격</div>
+  <div class="tctl">화면 <b>드래그</b> 이동 · <b>자동</b> 공격</div>
+  <div id="ath-hint" style="display:none;margin-top:8px;font-size:9px;color:#8a6030;letter-spacing:0.5px;text-align:center;line-height:1.5;">
+    전체화면: Safari 하단 <b style="color:#c89040">공유(□↑)</b> → <b style="color:#c89040">홈 화면에 추가</b>
+  </div>
 </div>
 
 <!-- Title Ranking Modal -->
@@ -831,12 +834,15 @@ function onTouchStart(e){
 function onTouchMove(e){
   e.preventDefault();
   _dbgMoveCount++;
-  for(const t of e.changedTouches){
-    if(t.identifier === touchMove.id){
-      const g = clientToGame(t.clientX, t.clientY);
-      touchMove.curX = g.x;
-      touchMove.curY = g.y;
-    }
+  if(!touchMove.active) return;
+  // identifier 우선 매칭, 실패 시 첫 번째 터치로 폴백 (iOS 버그 대응)
+  let t = null;
+  for(const ct of e.changedTouches){ if(ct.identifier === touchMove.id){ t = ct; break; } }
+  if(!t && e.changedTouches.length > 0) t = e.changedTouches[0];
+  if(t){
+    const g = clientToGame(t.clientX, t.clientY);
+    touchMove.curX = g.x;
+    touchMove.curY = g.y;
   }
 }
 
@@ -5881,6 +5887,16 @@ function darkenColor(hex, amount){
 // ════════════════════════════════════════════════════════════════════
 hideHUD(); // 타이틀 화면에서 HUD 숨김
 requestAnimationFrame(tick);
+
+// iOS Safari 전체화면 힌트 — 홈 화면에 추가하지 않은 경우에만 표시
+(function showIOSHint(){
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = !!window.navigator.standalone;
+  if(isIOS && !isStandalone){
+    const el = document.getElementById('ath-hint');
+    if(el) el.style.display = 'block';
+  }
+})();
 
 // 스플래시: 첫 터치/클릭에서 BGM 시작 + 오버레이 페이드아웃
 (function setupSplash(){
