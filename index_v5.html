@@ -2733,9 +2733,10 @@ function addKillScore(type, isCrit, x, y){
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 글로벌 랭킹 — GitHub Contents API 기반
+// 글로벌 랭킹 — Cloudflare Worker 프록시 경유 저장, GitHub Raw 로드
 // ════════════════════════════════════════════════════════════════════
-const GH_TOKEN  = atob('Z2hv X0V4VXJRRWRzc2YxcGgyZGN4cXM2R0xobWFVMzdnMzFkbmFRZQ=='.replace(/ /g,''));
+// 쓰기: Cloudflare Worker가 GH_TOKEN 보관 (클라이언트에 노출 없음)
+const RANK_WORKER = 'https://hanyang-rank.vandx1.workers.dev';
 const GH_SCORES = 'https://api.github.com/repos/vandx1-stack/hanyang-ranking/contents/scores/';
 const GH_RAW    = 'https://raw.githubusercontent.com/vandx1-stack/hanyang-ranking/main/scores/';
 
@@ -2775,18 +2776,16 @@ async function saveRanking(score, level, time, kills, stageNum){
 
   let ghOk = false;
   try {
-    const content = btoa(JSON.stringify(entry));
-    const putRes = await fetch(`${GH_SCORES}${_lastTs}.json`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${GH_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ message: `score:${score}`, content })
+    // Cloudflare Worker 프록시로 저장 (토큰은 Worker 환경변수에 보관)
+    const putRes = await fetch(RANK_WORKER, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ts: _lastTs, entry })
     });
-    if(putRes.ok){ ghOk = true; }
-    else { console.warn('[rank] save PUT failed:', putRes.status, putRes.statusText); }
-  } catch(e) { console.warn('[rank] save fetch error:', e); }
+    const result = await putRes.json();
+    if(result.ok){ ghOk = true; }
+    else { console.warn('[rank] worker save failed:', result.status); }
+  } catch(e) { console.warn('[rank] worker fetch error:', e); }
 
   // 순위: GitHub 성공 시 전체 목록 기준, 실패 시 로컬 기준
   if(ghOk){
@@ -2804,7 +2803,6 @@ async function saveRanking(score, level, time, kills, stageNum){
 async function loadRankings(){
   try {
     const listRes = await fetch(GH_SCORES, {
-      headers: { 'Authorization': `token ${GH_TOKEN}` },
       signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
     });
     if(!listRes.ok){
