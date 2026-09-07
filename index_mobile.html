@@ -831,8 +831,7 @@ function onTouchMove(e){
 
 function onTouchEnd(e){
   e.preventDefault();
-  touchTarget.active = false;
-  touchInput.dx = 0; touchInput.dy = 0;
+  // 손가락을 떼도 목표 지점까지 계속 이동 (도달 시 자동 정지)
 }
 
 // updatePlayer()에서 호출 — 플레이어 위치 기반으로 방향 계산
@@ -841,8 +840,12 @@ function updateTouchInput(px, py){
   const dx = touchTarget.x - px;
   const dy = touchTarget.y - py;
   const dist = Math.sqrt(dx*dx + dy*dy);
-  if(dist < TOUCH_STOP_R){ touchInput.dx = 0; touchInput.dy = 0; }
-  else { touchInput.dx = dx / dist; touchInput.dy = dy / dist; }
+  if(dist < TOUCH_STOP_R){
+    touchInput.dx = 0; touchInput.dy = 0;
+    touchTarget.active = false; // 도달 → 목표 해제
+  } else {
+    touchInput.dx = dx / dist; touchInput.dy = dy / dist;
+  }
 }
 
 // 캔버스에 터치 이벤트 연결
