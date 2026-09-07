@@ -2736,7 +2736,7 @@ function addKillScore(type, isCrit, x, y){
 // 글로벌 랭킹 — Cloudflare Worker 프록시 경유 저장, GitHub Raw 로드
 // ════════════════════════════════════════════════════════════════════
 // 쓰기: Cloudflare Worker가 GH_TOKEN 보관 (클라이언트에 노출 없음)
-const RANK_WORKER = 'https://hanyang-rank.vandx1.workers.dev';
+const RANK_WORKER = 'https://hanyang-rank.rank-worker.workers.dev';
 const GH_SCORES = 'https://api.github.com/repos/vandx1-stack/hanyang-ranking/contents/scores/';
 const GH_RAW    = 'https://raw.githubusercontent.com/vandx1-stack/hanyang-ranking/main/scores/';
 
