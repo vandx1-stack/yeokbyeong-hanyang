@@ -3557,7 +3557,7 @@ function checkPlayerDeath(){
   }
 }
 
-function _triggerGameOver(){
+async function _triggerGameOver(){
   try {
     BGM.fadeOut(1.0);
     setTimeout(()=>{ try { BGM.ending(); } catch(e){ console.warn('BGM.ending failed:', e); } }, 1150);
@@ -3565,14 +3565,15 @@ function _triggerGameOver(){
   phase = 'gameover';
   const mm=Math.floor(gameTime/60), ss=Math.floor(gameTime%60);
   const finalScore = gs.score;
-  const myRank = saveRanking(finalScore, gs.player.level, gameTime, gs.kills, stage);
   document.getElementById('goscore').textContent = finalScore.toLocaleString();
-  document.getElementById('gorank').textContent =
-    myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
+  document.getElementById('gorank').textContent = '랭킹 계산 중…';
   document.getElementById('gost').textContent =
     `STAGE ${stage}  ·  생존 ${mm}분 ${ss}초  ·  Lv.${gs.player.level}  ·  처치 ${gs.kills}  ·  최대콤보 ${gs.bestCombo}연`;
-  renderRankingTable(myRank);
   showPanel('go');
+  const myRank = await saveRanking(finalScore, gs.player.level, gameTime, gs.kills, stage);
+  document.getElementById('gorank').textContent =
+    myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
+  renderRankingTable(myRank);
 }
 
 // ── 스테이지 클리어 ─────────────────────────────────────────────
