@@ -505,6 +505,13 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
         <div class="cs-desc">이동 방향으로 검을 휘둘러<br>광역 참격을 가함</div>
         <div class="cs-hint">터치하여 선택</div>
       </div>
+      <div class="cs-card" data-char="archer">
+        <div class="cs-portrait"><canvas class="cs-portrait-cv" width="88" height="88" data-src="player_archer"></canvas></div>
+        <div class="cs-name">궁수</div>
+        <div class="cs-weapon">직선 화살 사격</div>
+        <div class="cs-desc">같은 선상의 적을 향해<br>화살을 자동으로 발사</div>
+        <div class="cs-hint">터치하여 선택</div>
+      </div>
     </div>
     <div class="panel-rule"></div>
   </div>
@@ -570,6 +577,7 @@ let spritesReady = false;
   const defs = {
     player:       'assets/PC_여도사.png',
     player_sword: 'assets/PC_검객.png',
+    player_archer:'assets/PC_여궁수.png',
     z_normal:   'assets/NPC_근접좀비.png',
     z_runner:   'assets/NPC_돌진좀비.png',
     z_archer:   'assets/NPC_원거리좀비.png',
@@ -795,9 +803,19 @@ const UPGRADE_SWORDSMAN = [
   { id:'slash_cnt',  name:'다단 참격',  desc:'연격 +1회 (최대 5회)',    apply: p=>{ p.slashCount = Math.min(5, p.slashCount + 1); } },
 ];
 
+// ── 궁수 전용 업그레이드 ───────────────────────────────────────────
+const UPGRADE_ARCHER = [
+  { id:'bow_spd',    name:'속사',       desc:'발사 속도 +35%',          apply: p=>{ p.arrowRate *= 1.35; } },
+  { id:'bow_dmg',    name:'철촉',       desc:'화살 피해 +35%',          apply: p=>{ p.arrowDmg *= 1.35; } },
+  { id:'bow_spread', name:'산탄',       desc:'화살 +2발 부채꼴 발사',   apply: p=>{ p.arrowSpreadCount = Math.min(5, p.arrowSpreadCount + 2); } },
+];
+
 function getUpgradePool(){
   const p = gs && gs.player;
-  const charSpec = (p && p.weapon === 'slash') ? UPGRADE_SWORDSMAN : UPGRADE_PRIEST;
+  let charSpec;
+  if(p && p.weapon === 'slash') charSpec = UPGRADE_SWORDSMAN;
+  else if(p && p.weapon === 'bow') charSpec = UPGRADE_ARCHER;
+  else charSpec = UPGRADE_PRIEST;
   return [...UPGRADE_COMMON, ...charSpec];
 }
 
@@ -977,6 +995,8 @@ function updateHUD(){
   document.getElementById('lvt').textContent = `Lv.${p.level}`;
   document.getElementById('swinfo').textContent = (p.weapon === 'slash')
     ? `刀 ${p.slashRate.toFixed(1)}/s`
+    : p.weapon === 'bow'
+    ? `弓 ${p.arrowRate.toFixed(1)}/s`
     : `符×${p.swordCount}`;
   const scrEl = document.getElementById('scr');
   const newScr = gs.score.toLocaleString();
@@ -1002,6 +1022,7 @@ function updateHUD(){
   if(p.lifesteal > 0)      chips.push({cls:'life', l:'흡혈',  v:`${Math.round(p.lifesteal*100)}%`});
   if(p.knockbackMult > 1)  chips.push({cls:'kb',   l:'격파',  v:`×${p.knockbackMult.toFixed(1)}`});
   if(p.slashCount > 1)    chips.push({cls:'atk',  l:'연격',  v:`×${p.slashCount}`});
+  if(p.arrowSpreadCount > 1) chips.push({cls:'atk', l:'산탄', v:`×${p.arrowSpreadCount}`});
   if(p.explosionStacks > 0){ const ec=Math.min(p.explosionStacks*15,50); chips.push({cls:'exp', l:'폭발', v:`${ec}%·${80+p.explosionStacks*20}px`}); }
   const panel = document.getElementById('statpanel');
   const newHTML = chips.length
@@ -2088,6 +2109,10 @@ const CHARACTERS = {
     id: 'swordsman', name: '검객',
     sprite: 'player_sword', weapon: 'slash',
   },
+  archer: {
+    id: 'archer', name: '궁수',
+    sprite: 'player_archer', weapon: 'bow',
+  },
 };
 let selectedCharacter = 'priest';
 
@@ -2157,6 +2182,13 @@ function initGame(){
       slashAngle: 0,        // 마지막 참격 방향
       slashSide: 1,         // 애니 교차 (1/-1)
       slashCount: 1,        // 참격당 히트 회수 (업그레이드)
+      // 궁수 화살 시스템 (bow)
+      arrowRate: 1.8,       // 초당 발사 횟수
+      arrowDmg: 32,
+      arrowSpeed: 420,
+      arrowTimer: 0,
+      arrowAnimTimer: 0,
+      arrowSpreadCount: 1,  // 발사 화살 수 (업그레이드)
       iframes: 0,
       hitFlash: 0,
       facingRight: true,
@@ -2166,6 +2198,7 @@ function initGame(){
     zombies: [],
     particles: [],
     projectiles: [],
+    arrows: [],
     xpOrbs: [],
     dmgNumbers: [],
     fireTickets: [],
@@ -2427,6 +2460,7 @@ function update(dt){
   updatePlayer(dt);
   updateZombies(dt);
   updateProjectiles(dt);
+  updateArrows(dt);
   updateParticles(dt);
   updateXpOrbs(dt);
   updateDmgNumbers(dt);
@@ -2473,6 +2507,8 @@ function updatePlayer(dt){
   // 무기 시스템 분기
   if(p.weapon === 'slash'){
     updateSwordsmanCombat(dt);
+  } else if(p.weapon === 'bow'){
+    updateArcherCombat(dt);
   } else {
     // 회전 부적 (기본)
     p.swordAngle += p.swordRotSpeed * dt;
@@ -2492,6 +2528,10 @@ function updatePlayer(dt){
     const totalDur = Math.max(0.001, Math.min(0.28, (1/p.slashRate) * 0.65));
     const progress = 1 - (p.slashAnimTimer / totalDur);
     p.animFrame = progress < 0.35 ? 0 : 1;
+  } else if(p.weapon === 'bow' && p.arrowAnimTimer > 0){
+    p.animState = 'attack';
+    const aDur = Math.max(0.001, (1/p.arrowRate) * 0.55);
+    p.animFrame = (1 - p.arrowAnimTimer / aDur) < 0.5 ? 0 : 1;
   } else {
     const moving = Math.abs(p.vx) > 8 || Math.abs(p.vy) > 8;
     const prevPState = p.animState;
@@ -2603,6 +2643,135 @@ function performSlash(p, angle){
     }
     z.swordHitTimer = (1/p.slashRate) * 0.85;
   }
+}
+
+// ── 궁수 시스템 ──────────────────────────────────────────────────────
+const ARROW_CONE = Math.PI / 12; // ±15° 탐지 원뿔
+
+function updateArcherCombat(dt){
+  const p = gs.player;
+  if(p.arrowAnimTimer > 0) p.arrowAnimTimer -= dt;
+  p.arrowTimer -= dt;
+  if(p.arrowTimer > 0) return;
+
+  // 4방향 직선 탐지: 각도 0, π/2, π, 3π/2 (우/하/좌/상)
+  const dirs = [0, Math.PI/2, Math.PI, Math.PI*3/2];
+  let bestDir = null, bestDist = Infinity, bestTarget = null;
+  for(const dir of dirs){
+    for(const z of gs.zombies){
+      if(z.dead) continue;
+      const dx = z.x - p.x, dy = z.y - p.y;
+      const dist = Math.hypot(dx, dy);
+      if(dist > 600) continue;
+      const zAngle = Math.atan2(dy, dx);
+      let delta = zAngle - dir;
+      while(delta >  Math.PI) delta -= Math.PI*2;
+      while(delta < -Math.PI) delta += Math.PI*2;
+      if(Math.abs(delta) > ARROW_CONE) continue;
+      if(dist < bestDist){ bestDist = dist; bestDir = dir; bestTarget = z; }
+    }
+  }
+
+  if(!bestTarget){
+    p.arrowTimer = 0.08;
+    return;
+  }
+
+  // 화살 발사 (산탄 포함)
+  const spread = p.arrowSpreadCount;
+  const spreadStep = (spread > 1) ? (Math.PI * 12/180) : 0; // ±12° 간격
+  const halfSpan = spreadStep * Math.floor(spread / 2);
+  const baseAngle = Math.atan2(bestTarget.y - p.y, bestTarget.x - p.x);
+  if(Math.cos(baseAngle) >= 0) p.facingRight = true;
+  else p.facingRight = false;
+
+  for(let i = 0; i < spread; i++){
+    const offset = -halfSpan + spreadStep * i;
+    const ang = baseAngle + offset;
+    gs.arrows.push({
+      x: p.x, y: p.y,
+      vx: Math.cos(ang) * p.arrowSpeed,
+      vy: Math.sin(ang) * p.arrowSpeed,
+      dmg: p.arrowDmg * p.atkMult,
+      angle: ang,
+      life: 2.0,
+    });
+  }
+
+  p.arrowAnimTimer = Math.min(0.25, (1/p.arrowRate) * 0.55);
+  p.arrowTimer = Math.max(0.10, 1 / p.arrowRate);
+  try { if(typeof sndHwando === 'function') sndHwando(false); } catch(e){}
+}
+
+function updateArrows(dt){
+  const p = gs.player;
+  if(!gs.arrows) return;
+  for(let i = gs.arrows.length - 1; i >= 0; i--){
+    const a = gs.arrows[i];
+    a.life -= dt;
+    if(a.life <= 0){ gs.arrows.splice(i,1); continue; }
+    a.x += a.vx * dt;
+    a.y += a.vy * dt;
+    if(a.x < -80 || a.x > MAP_W+80 || a.y < -80 || a.y > PLAY_H+80){
+      gs.arrows.splice(i,1); continue;
+    }
+    // 좀비 충돌 검사
+    let hit = false;
+    for(const z of gs.zombies){
+      if(z.dead) continue;
+      const dx = z.x - a.x, dy = z.y - a.y;
+      if(Math.hypot(dx,dy) > z.radius + 6) continue;
+      // 명중
+      const isCrit = Math.random() < (0.06 + p.critChance);
+      let dmg = a.dmg + (Math.random()*4-2);
+      if(isCrit) dmg *= 2.2;
+      dmg = Math.round(dmg);
+      z.hp -= dmg;
+      z._lastHitCrit = isCrit;
+      if(p.lifesteal > 0) p.hp = Math.min(p.maxHp, p.hp + dmg * p.lifesteal);
+      if(p.fireDmg > 0) z.fireTimer = Math.max(z.fireTimer, 3.0);
+      z.hitFlash = 1;
+      const nb = 80 * p.knockbackMult * (1 - z.def.knockbackRes);
+      const nd = Math.max(0.01, Math.hypot(dx,dy));
+      z.knockVx += (dx/nd)*nb; z.knockVy += (dy/nd)*nb;
+      spawnHitImpact(a.x, a.y, a.angle, isCrit);
+      spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit);
+      gs.screen.shakeX = isCrit ? 4 : 1.5;
+      gs.screen.shakeY = isCrit ? 2 : 0.8;
+      gs.hitStop = isCrit ? 0.04 : 0.01;
+      if(z.hp <= 0) killZombie(z);
+      gs.arrows.splice(i,1);
+      hit = true;
+      break;
+    }
+  }
+}
+
+function drawArrows(){
+  if(!gs.arrows || !gs.arrows.length) return;
+  ctx.save();
+  for(const a of gs.arrows){
+    const len = 22, headLen = 7;
+    const cos = Math.cos(a.angle), sin = Math.sin(a.angle);
+    const tx = a.x + cos*len*0.5, ty = a.y + sin*len*0.5;
+    const bx = a.x - cos*len*0.5, by = a.y - sin*len*0.5;
+    // 화살대
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(tx, ty);
+    ctx.strokeStyle = '#c8a060';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    // 화살촉
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx - cos*headLen + sin*headLen*0.45, ty - sin*headLen - cos*headLen*0.45);
+    ctx.lineTo(tx - cos*headLen - sin*headLen*0.45, ty - sin*headLen + cos*headLen*0.45);
+    ctx.closePath();
+    ctx.fillStyle = '#e0d080';
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function updateSwordHits(){
@@ -3600,6 +3769,7 @@ function stageClear(){
   }
   // 발사체 제거
   gs.projectiles = [];
+  gs.arrows = [];
   // HP 보너스 회복 (스테이지 클리어 보상)
   const healAmt = Math.round(gs.player.maxHp * 0.25);
   gs.player.hp = Math.min(gs.player.maxHp, gs.player.hp + healAmt);
@@ -3640,8 +3810,10 @@ function nextStage(){
   p.swordCount = 1; p.swordRotSpeed = 2.2; p.swordRadius = 55;
   p.slashRate = 1.6; p.slashRadius = 82; p.slashArc = Math.PI*0.65;
   p.slashDmg = 26; p.slashTimer = 0; p.slashCount = 1;
+  p.arrowRate = 1.8; p.arrowDmg = 32; p.arrowSpeed = 420;
+  p.arrowTimer = 0; p.arrowAnimTimer = 0; p.arrowSpreadCount = 1;
   p.iframes = 0; p.animState = 'idle'; p.animFrame = 0; p.animClock = 0;
-  gs.zombies = []; gs.projectiles = []; gs.xpOrbs = [];
+  gs.zombies = []; gs.projectiles = []; gs.arrows = []; gs.xpOrbs = [];
   hideAllPanels();
   phase = 'playing';
   spawnZombie('normal');
@@ -3789,7 +3961,7 @@ function showCharacterSelect(){
   });
 }
 function selectCharacter(id){
-  selectedCharacter = (id === 'swordsman') ? 'swordsman' : 'priest';
+  selectedCharacter = CHARACTERS[id] ? id : 'priest';
   initGame();
 }
 document.querySelectorAll('#cs .cs-card').forEach(card => {
@@ -3864,12 +4036,12 @@ function draw(){
   if(phase==='title'){ drawTitleBackground(); return; }
   if(phase==='gameover'){
     drawBackground();
-    if(gs){ drawBloodPools(); drawXpOrbs(); drawZombies(); drawProjectiles(); drawPlayer_(); drawOrbitingTalismans(); drawParticles(); drawDmgNumbers(); }
+    if(gs){ drawBloodPools(); drawXpOrbs(); drawZombies(); drawProjectiles(); drawArrows(); drawPlayer_(); drawOrbitingTalismans(); drawParticles(); drawDmgNumbers(); }
     return;
   }
   if(phase==='stageclear'){
     drawBackground();
-    if(gs){ drawBloodPools(); drawXpOrbs(); drawZombies(); drawProjectiles(); drawPlayer_(); drawOrbitingTalismans(); drawParticles(); drawDmgNumbers(); drawComboOverlay(); updateHUD(); }
+    if(gs){ drawBloodPools(); drawXpOrbs(); drawZombies(); drawProjectiles(); drawArrows(); drawPlayer_(); drawOrbitingTalismans(); drawParticles(); drawDmgNumbers(); drawComboOverlay(); updateHUD(); }
     return;
   }
 
@@ -3885,6 +4057,7 @@ function draw(){
     drawXpOrbs();
     drawZombies();
     drawProjectiles();
+    drawArrows();
     drawPlayer_();
     drawOrbitingTalismans();
     drawParticles();
@@ -4683,7 +4856,7 @@ function drawRuins(){
 function drawOrbitingSwords(){ drawOrbitingTalismans(); }
 function drawOrbitingTalismans(){
   const p = gs.player;
-  if(p.weapon === 'slash') return; // 검객은 부적 렌더링 안 함
+  if(p.weapon === 'slash' || p.weapon === 'bow') return; // 검객·궁수는 부적 렌더링 안 함
   const R = p.swordRadius;
   const count = p.swordCount;
   // 회전 중심: 스프라이트 몸 중앙
@@ -5201,7 +5374,17 @@ function drawPlayer_(){
     hit:    [[0,2]],
     death:  [[0,2],[3,2]],
   };
-  const P_FRAMES = (p.weapon === 'slash') ? P_FRAMES_SWORD : P_FRAMES_PRIEST;
+  // 궁수 프레임 테이블 — PC_궁수 4×3 시트
+  const P_FRAMES_ARCHER = {
+    idle:   [[0,0]],
+    walk:   [[0,0],[1,0]],
+    attack: [[2,0],[0,1]],
+    hit:    [[1,2]],
+    death:  [[2,2],[3,2]],
+  };
+  const P_FRAMES = (p.weapon === 'slash') ? P_FRAMES_SWORD
+    : (p.weapon === 'bow') ? P_FRAMES_ARCHER
+    : P_FRAMES_PRIEST;
   const pSeq = P_FRAMES[p.animState] || P_FRAMES.idle;
   const [sc, sr] = pSeq[Math.min(p.animFrame, pSeq.length - 1)];
   const spriteKey = p.spriteKey || 'player';
