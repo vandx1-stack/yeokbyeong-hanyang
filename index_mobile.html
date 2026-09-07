@@ -792,7 +792,7 @@ const UPGRADE_SWORDSMAN = [
   { id:'slash_spd',  name:'신속',       desc:'참격 속도 +30%',         apply: p=>{ p.slashRate *= 1.30; } },
   { id:'slash_rng',  name:'광참',       desc:'참격 범위 +22px',        apply: p=>{ p.slashRadius += 22; } },
   { id:'slash_arc',  name:'대회전',     desc:'참격 각도 +25°',         apply: p=>{ p.slashArc = Math.min(Math.PI*2, p.slashArc + Math.PI*25/180); } },
-  { id:'slash_dmg',  name:'검력 강화',  desc:'참격 데미지 +30%',       apply: p=>{ p.slashDmg *= 1.30; } },
+  { id:'slash_cnt',  name:'다단 참격',  desc:'연격 +1회 (최대 5회)',    apply: p=>{ p.slashCount = Math.min(5, p.slashCount + 1); } },
 ];
 
 function getUpgradePool(){
@@ -1001,6 +1001,7 @@ function updateHUD(){
   if(p.fireDmg > 0)        chips.push({cls:'fire', l:'화염',  v:`+${p.fireDmg}`});
   if(p.lifesteal > 0)      chips.push({cls:'life', l:'흡혈',  v:`${Math.round(p.lifesteal*100)}%`});
   if(p.knockbackMult > 1)  chips.push({cls:'kb',   l:'격파',  v:`×${p.knockbackMult.toFixed(1)}`});
+  if(p.slashCount > 1)    chips.push({cls:'atk',  l:'연격',  v:`×${p.slashCount}`});
   if(p.explosionStacks > 0){ const ec=Math.min(p.explosionStacks*15,50); chips.push({cls:'exp', l:'폭발', v:`${ec}%·${80+p.explosionStacks*20}px`}); }
   const panel = document.getElementById('statpanel');
   const newHTML = chips.length
@@ -2564,32 +2565,35 @@ function performSlash(p, angle){
     while(delta < -Math.PI) delta += Math.PI*2;
     if(Math.abs(delta) > halfArc) continue;
 
+    const hits = p.slashCount || 1;
+    for(let h = 0; h < hits; h++){
+      const isCrit = Math.random() < (0.06 + p.critChance);
+      let dmg = (p.slashDmg + (Math.random()*5-2)) * p.atkMult;
+      if(isCrit) dmg *= 2.2;
+      dmg = Math.round(dmg);
+      z.hp -= dmg;
+      z._lastHitCrit = isCrit;
+      if(p.lifesteal > 0) p.hp = Math.min(p.maxHp, p.hp + dmg * p.lifesteal);
+      if(p.fireDmg > 0) z.fireTimer = Math.max(z.fireTimer, 3.0);
+
+      const nb = 140 * p.knockbackMult * (1 - z.def.knockbackRes) / hits;
+      const nd2 = Math.max(0.01, dist);
+      z.knockVx += (dxx/nd2) * nb;
+      z.knockVy += (dyy/nd2) * nb;
+
+      z.hitFlash = 1;
+      const ox = (Math.random()-0.5)*12, oy = (Math.random()-0.5)*8;
+      spawnHitImpact(z.x + ox, z.y - z.radius*0.5 + oy, angle, isCrit);
+      spawnDmgNum(z.x + ox, z.y - z.radius - h*14, dmg, isCrit);
+
+      gs.screen.shakeX = isCrit ? 5 : 2;
+      gs.screen.shakeY = isCrit ? 3 : 1;
+      gs.hitStop = isCrit ? 0.04 : 0.015;
+      try { sndHwando(isCrit); } catch(e){}
+
+      if(z.hp <= 0){ killZombie(z); break; }
+    }
     z.swordHitTimer = (1/p.slashRate) * 0.85;
-
-    const isCrit = Math.random() < (0.06 + p.critChance);
-    let dmg = (p.slashDmg + (Math.random()*5-2)) * p.atkMult;
-    if(isCrit) dmg *= 2.2;
-    dmg = Math.round(dmg);
-    z.hp -= dmg;
-    z._lastHitCrit = isCrit;
-    if(p.lifesteal > 0) p.hp = Math.min(p.maxHp, p.hp + dmg * p.lifesteal);
-    if(p.fireDmg > 0) z.fireTimer = Math.max(z.fireTimer, 3.0);
-
-    const nb = 140 * p.knockbackMult * (1 - z.def.knockbackRes);
-    const nd2 = Math.max(0.01, dist);
-    z.knockVx += (dxx/nd2) * nb;
-    z.knockVy += (dyy/nd2) * nb;
-
-    z.hitFlash = 1;
-    spawnHitImpact(z.x, z.y - z.radius*0.5, angle, isCrit);
-    spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit);
-
-    gs.screen.shakeX = isCrit ? 5 : 2;
-    gs.screen.shakeY = isCrit ? 3 : 1;
-    gs.hitStop = isCrit ? 0.04 : 0.015;
-    try { sndHwando(isCrit); } catch(e){}
-
-    if(z.hp <= 0) killZombie(z);
   }
 }
 
