@@ -791,6 +791,7 @@ const touchInput = { dx: 0, dy: 0 };
 const touchTarget = { active: false, x: 0, y: 0 }; // 목표 좌표
 const TOUCH_STOP_R = 16; // 이 반경 이내면 정지 (game px)
 let isTouchDevice = false;
+let _touchCooldown = false; // 패널 닫힌 직후 ghost touch 차단용
 
 // 게임 좌표 변환 (CSS transform scale 역산)
 function clientToGame(clientX, clientY){
@@ -808,7 +809,7 @@ function onTouchStart(e){
     document.body.classList.add('touch-device');
   }
   _audio();
-  if(phase === 'playing'){
+  if(phase === 'playing' && !_touchCooldown){
     for(const t of e.changedTouches){
       const g = clientToGame(t.clientX, t.clientY);
       if(g.y < PLAY_H){
@@ -3528,9 +3529,11 @@ function pickUpgrade(idx){
   phase = 'playing';
   levelupChoices = [];
   hideAllPanels();
-  // 메뉴 탭 좌표로 이동하지 않도록 터치 목표 초기화
   touchTarget.active = false;
   touchInput.dx = 0; touchInput.dy = 0;
+  // iOS ghost touch 차단: 패널 사라진 직후 350ms 동안 touchstart 무시
+  _touchCooldown = true;
+  setTimeout(() => { _touchCooldown = false; }, 350);
 }
 
 // 키 입력
