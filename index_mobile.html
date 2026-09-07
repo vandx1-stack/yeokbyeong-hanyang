@@ -363,7 +363,20 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 <div id="splash">
   <div class="sp-tit">역병의 한양</div>
   <div class="sp-sub">Plague of Hanyang</div>
-  <div class="sp-tap">⚔ 터 치 하 여 시 작 ⚔</div>
+  <div id="sp-name-wrap" style="display:none;flex-direction:column;align-items:center;gap:6px;margin-top:16px;">
+    <div style="font-size:10px;color:#8a6030;letter-spacing:2px;">랭킹에 표시될 이름을 입력하세요</div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <input id="sp-name-input" type="text" maxlength="10" placeholder="닉네임 (최대 10자)"
+        style="background:rgba(30,10,0,0.85);border:1px solid rgba(180,90,20,0.6);color:#e0c080;
+               padding:5px 10px;font-size:12px;border-radius:2px;width:140px;font-family:inherit;
+               outline:none;text-align:center;">
+      <button id="sp-name-save"
+        style="background:rgba(100,40,5,0.85);border:1px solid rgba(180,90,20,0.6);
+               color:#d4a020;padding:5px 12px;font-size:11px;border-radius:2px;
+               cursor:pointer;font-family:inherit;white-space:nowrap;">확인</button>
+    </div>
+  </div>
+  <div class="sp-tap" id="sp-tap-btn">⚔ 터 치 하 여 시 작 ⚔</div>
   <div class="sp-hint">가로 화면(랜드스케이프) 권장</div>
 </div>
 <!-- 세로 모드 경고 -->
@@ -505,13 +518,6 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
     <div id="goscore">0</div>
     <div id="gorank"></div>
     <div id="gost"></div>
-    <div id="go-name-wrap" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:6px 0;">
-      <input id="go-name-input" type="text" maxlength="10" placeholder="닉네임 (최대 10자)"
-        style="background:rgba(30,10,0,0.85);border:1px solid rgba(180,90,20,0.5);color:#e0c080;
-               padding:4px 8px;font-size:11px;border-radius:2px;width:130px;font-family:inherit;outline:none;">
-      <button id="go-name-save" style="background:rgba(100,40,5,0.8);border:1px solid rgba(180,90,20,0.5);
-               color:#d4a020;padding:4px 10px;font-size:10px;border-radius:2px;cursor:pointer;font-family:inherit;">저장</button>
-    </div>
     <div id="gorankwrap"><table class="rktbl"><thead><tr><th>순위</th><th>이름</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead><tbody id="rktbody"></tbody></table></div>
     <div class="gobtnwrap">
       <div class="gorst">터치하여 재도전</div>
@@ -3502,14 +3508,6 @@ function _triggerGameOver(){
     myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
   document.getElementById('gost').textContent =
     `STAGE ${stage}  ·  생존 ${mm}분 ${ss}초  ·  Lv.${gs.player.level}  ·  처치 ${gs.kills}  ·  최대콤보 ${gs.bestCombo}연`;
-  // 닉네임 없으면 입력창 강조
-  const inp = document.getElementById('go-name-input');
-  if(inp){
-    const saved = localStorage.getItem('hanyang_name') || '';
-    inp.value = saved;
-    if(!saved){ inp.style.borderColor='rgba(220,160,40,0.9)'; inp.focus(); }
-    else { inp.style.borderColor=''; }
-  }
   renderRankingTable(myRank);
   showPanel('go');
 }
@@ -3635,22 +3633,6 @@ _bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} showTitleRanking(); });
 _bindBtn('btn-rank-back', hideTitleRanking);
 _bindBtn('btn-go-home', goToTitle);
 
-// 닉네임 입력 초기화 및 저장
-(function initNameInput(){
-  const inp = document.getElementById('go-name-input');
-  const btn = document.getElementById('go-name-save');
-  if(!inp || !btn) return;
-  inp.value = localStorage.getItem('hanyang_name') || '';
-  const save = () => {
-    const n = inp.value.trim().slice(0,10) || '익명';
-    _setPlayerName(n); inp.value = n;
-    btn.textContent = '✓';
-    setTimeout(() => { btn.textContent = '저장'; }, 1200);
-  };
-  btn.addEventListener('click', save);
-  btn.addEventListener('touchend', e => { e.preventDefault(); save(); });
-  inp.addEventListener('keydown', e => { if(e.key === 'Enter') save(); });
-})();
 
 // 캐릭터 선택 화면
 function showCharacterSelect(){
@@ -5954,11 +5936,16 @@ requestAnimationFrame(tick);
   }
 })();
 
-// 스플래시: 첫 터치/클릭에서 BGM 시작 + 오버레이 페이드아웃
+// 스플래시: 닉네임 첫 입력(없을 때만) + BGM 시작 + 오버레이 페이드아웃
 (function setupSplash(){
-  const sp = document.getElementById('splash');
+  const sp      = document.getElementById('splash');
   if(!sp) return;
-  let dismissed = false;
+  const nameWrap = document.getElementById('sp-name-wrap');
+  const nameInp  = document.getElementById('sp-name-input');
+  const nameSave = document.getElementById('sp-name-save');
+  const tapBtn   = document.getElementById('sp-tap-btn');
+  let dismissed  = false;
+
   const dismiss = (e) => {
     if(dismissed) return;
     dismissed = true;
@@ -5967,12 +5954,47 @@ requestAnimationFrame(tick);
     sp.classList.add('fadeout');
     setTimeout(()=>{ sp.parentNode && sp.parentNode.removeChild(sp); }, 620);
   };
-  sp.addEventListener('touchstart', dismiss, { passive: false });
-  sp.addEventListener('pointerdown', dismiss);
-  sp.addEventListener('click',       dismiss);
-  // 키 입력도 허용
-  const keyOnce = (e)=>{ dismiss(e); document.removeEventListener('keydown', keyOnce, true); };
-  document.addEventListener('keydown', keyOnce, true);
+
+  if(!localStorage.getItem('hanyang_name')){
+    // 이름 없음 → 입력창 표시, 탭 버튼 숨김
+    if(nameWrap) nameWrap.style.display = 'flex';
+    if(tapBtn)   tapBtn.style.display   = 'none';
+    const confirmName = () => {
+      const n = (nameInp ? nameInp.value.trim().slice(0,10) : '') || '익명';
+      _setPlayerName(n);
+      if(nameWrap) nameWrap.style.display = 'none';
+      if(tapBtn)   tapBtn.style.display   = '';
+      // 저장 후 바로 게임 시작할 수 있도록 dismiss에 이벤트 연결
+      sp.addEventListener('touchstart', dismiss, { passive: false });
+      sp.addEventListener('pointerdown', dismiss);
+      sp.addEventListener('click', dismiss);
+      const keyOnce = (e)=>{ dismiss(e); document.removeEventListener('keydown', keyOnce, true); };
+      document.addEventListener('keydown', keyOnce, true);
+    };
+    if(nameSave){
+      nameSave.addEventListener('click', e => { e.stopPropagation(); confirmName(); });
+      nameSave.addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); confirmName(); });
+    }
+    if(nameInp){
+      nameInp.addEventListener('keydown', e => { if(e.key === 'Enter') confirmName(); });
+      // 입력 클릭/터치가 dismiss 트리거되지 않도록 전파 차단
+      nameInp.addEventListener('click',      e => e.stopPropagation());
+      nameInp.addEventListener('touchstart', e => e.stopPropagation(), { passive: false });
+      nameInp.addEventListener('pointerdown',e => e.stopPropagation());
+    }
+    if(nameWrap){
+      nameWrap.addEventListener('click',      e => e.stopPropagation());
+      nameWrap.addEventListener('touchstart', e => e.stopPropagation(), { passive: false });
+      nameWrap.addEventListener('pointerdown',e => e.stopPropagation());
+    }
+  } else {
+    // 이름 있음 → 기존대로 터치하면 바로 시작
+    sp.addEventListener('touchstart', dismiss, { passive: false });
+    sp.addEventListener('pointerdown', dismiss);
+    sp.addEventListener('click',       dismiss);
+    const keyOnce = (e)=>{ dismiss(e); document.removeEventListener('keydown', keyOnce, true); };
+    document.addEventListener('keydown', keyOnce, true);
+  }
 })();
 </script>
 </body>
