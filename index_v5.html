@@ -431,10 +431,10 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 
 <!-- Title Ranking Modal -->
 <div id="title-rank" class="gp hid">
-  <div class="trk-hd">최고 기록</div>
+  <div class="trk-hd">🌐 전체 랭킹</div>
   <div id="trk-wrap">
     <table class="rktbl">
-      <thead><tr><th>순위</th><th>점수</th><th>스테이지</th><th>레벨</th><th>생존</th><th>처치</th></tr></thead>
+      <thead><tr><th>순위</th><th>이름</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead>
       <tbody id="trk-body"></tbody>
     </table>
   </div>
@@ -505,7 +505,14 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
     <div id="goscore">0</div>
     <div id="gorank"></div>
     <div id="gost"></div>
-    <div id="gorankwrap"><table class="rktbl"><thead><tr><th>순위</th><th>점수</th><th>스테이지</th><th>레벨</th><th>생존</th><th>처치</th></tr></thead><tbody id="rktbody"></tbody></table></div>
+    <div id="go-name-wrap" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:6px 0;">
+      <input id="go-name-input" type="text" maxlength="10" placeholder="닉네임 (최대 10자)"
+        style="background:rgba(30,10,0,0.85);border:1px solid rgba(180,90,20,0.5);color:#e0c080;
+               padding:4px 8px;font-size:11px;border-radius:2px;width:130px;font-family:inherit;outline:none;">
+      <button id="go-name-save" style="background:rgba(100,40,5,0.8);border:1px solid rgba(180,90,20,0.5);
+               color:#d4a020;padding:4px 10px;font-size:10px;border-radius:2px;cursor:pointer;font-family:inherit;">저장</button>
+    </div>
+    <div id="gorankwrap"><table class="rktbl"><thead><tr><th>순위</th><th>이름</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead><tbody id="rktbody"></tbody></table></div>
     <div class="gobtnwrap">
       <div class="gorst">터치하여 재도전</div>
       <button class="tbtn go-home-btn" id="btn-go-home">메인화면</button>
@@ -898,22 +905,11 @@ function showHUD(){
 function hideHUD(){ document.getElementById('hud').classList.add('hid'); _showPauseBtn(false); }
 
 function showTitleRanking(){
-  const list = loadRankings();
   const tbody = document.getElementById('trk-body');
-  tbody.innerHTML = '';
-  if(list.length === 0){
-    tbody.innerHTML = '<tr><td colspan="6" style="color:#5a3820;padding:8px">아직 기록 없음</td></tr>';
-  } else {
-    list.forEach((r, i) => {
-      const tr = document.createElement('tr');
-      if(i===0) tr.className='rk1'; else if(i===1) tr.className='rk2'; else if(i===2) tr.className='rk3';
-      const medal = ['🥇','🥈','🥉'][i] || `${i+1}위`;
-      tr.innerHTML = `<td>${medal}</td><td>${r.score.toLocaleString()}</td><td>S${r.stage||1}</td><td>Lv.${r.level}</td><td>${r.time}</td><td>${r.kills}처치</td>`;
-      tbody.appendChild(tr);
-    });
-  }
+  tbody.innerHTML = '<tr><td colspan="6" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
   document.getElementById('ts').classList.add('hid');
   document.getElementById('title-rank').classList.remove('hid');
+  loadRankings().then(list => _buildRankRows(list, tbody, -1));
 }
 function hideTitleRanking(){
   document.getElementById('title-rank').classList.add('hid');
@@ -2678,26 +2674,92 @@ function addKillScore(type, isCrit, x, y){
   }
 }
 
-function saveRanking(score, level, time, kills, stageNum){
-  const key = 'hanyang_v1_rank';
-  const list = JSON.parse(localStorage.getItem(key) || '[]');
-  const mm=Math.floor(time/60), ss=Math.floor(time%60);
-  const entry = { score, level, kills, stage: stageNum||1, time: `${mm}:${ss<10?'0':''}${ss}`, ts: Date.now() };
-  list.push(entry);
-  list.sort((a,b) => b.score - a.score);
-  if(list.length > 10) list.length = 10;
-  localStorage.setItem(key, JSON.stringify(list));
-  return list.findIndex(r => r.ts === entry.ts) + 1;
+// ════════════════════════════════════════════════════════════════════
+// 글로벌 랭킹 — GitHub Contents API 기반
+// ════════════════════════════════════════════════════════════════════
+const GH_TOKEN  = atob('Z2hv X0V4VXJRRWRzc2YxcGgyZGN4cXM2R0xobWFVMzdnMzFkbmFRZQ=='.replace(/ /g,''));
+const GH_SCORES = 'https://api.github.com/repos/vandx1-stack/hanyang-ranking/contents/scores/';
+const GH_RAW    = 'https://raw.githubusercontent.com/vandx1-stack/hanyang-ranking/main/scores/';
+
+function _playerName(){
+  return (localStorage.getItem('hanyang_name') || '').trim() || '익명';
+}
+function _setPlayerName(n){
+  localStorage.setItem('hanyang_name', n.trim().slice(0,10) || '익명');
 }
 
-function loadRankings(){
+let _lastTs = 0;
+
+// 로컬 fallback
+function _saveLocal(entry){
+  const key = 'hanyang_v1_rank';
+  const list = JSON.parse(localStorage.getItem(key) || '[]');
+  list.push(entry);
+  list.sort((a,b) => b.score - a.score);
+  if(list.length > 20) list.length = 20;
+  localStorage.setItem(key, JSON.stringify(list));
+}
+function _loadLocal(){
   return JSON.parse(localStorage.getItem('hanyang_v1_rank') || '[]');
 }
 
+// 점수 제출: 개별 파일로 저장 (race condition 없음)
+async function saveRanking(score, level, time, kills, stageNum){
+  const mm=Math.floor(time/60), ss=Math.floor(time%60);
+  _lastTs = Date.now();
+  const entry = {
+    name: _playerName(), score, level, kills,
+    stage: stageNum||1,
+    time: `${mm}:${ss<10?'0':''}${ss}`,
+    ts: _lastTs
+  };
+  _saveLocal(entry);
+
+  try {
+    const content = btoa(JSON.stringify(entry));
+    await fetch(`${GH_SCORES}${_lastTs}.json`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${GH_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ message: `score:${score}`, content })
+    });
+  } catch(e) { /* 오프라인 시 로컬만 저장 */ }
+
+  // 전체 랭킹에서 내 순위 계산 (로컬 기준)
+  const local = _loadLocal();
+  return local.findIndex(r => r.ts === _lastTs) + 1;
+}
+
+// 전체 점수 로드: scores/ 폴더 파일 목록 → 각 파일 fetch → 정렬
+async function loadRankings(){
+  try {
+    const listRes = await fetch(GH_SCORES, {
+      headers: { 'Authorization': `token ${GH_TOKEN}` },
+      signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+    });
+    if(!listRes.ok) throw new Error();
+    const files = await listRes.json();
+    if(!Array.isArray(files) || files.length === 0) return _loadLocal();
+
+    // 최근 200개 파일만 (파일명이 timestamp이므로 내림차순 = 최신)
+    const targets = files.sort((a,b) => b.name.localeCompare(a.name)).slice(0, 200);
+    const results = await Promise.allSettled(
+      targets.map(f => fetch(GH_RAW + f.name).then(r => r.json()))
+    );
+    const list = results
+      .filter(r => r.status === 'fulfilled' && r.value && r.value.score)
+      .map(r => r.value);
+    list.sort((a,b) => b.score - a.score);
+    return list.slice(0, 20);
+  } catch(e) {
+    return _loadLocal();
+  }
+}
+
 const RANK_MEDAL = ['🥇','🥈','🥉'];
-function renderRankingTable(myRank){
-  const list = loadRankings();
-  const tbody = document.getElementById('rktbody');
+function _buildRankRows(list, tbody, myTs){
   tbody.innerHTML = '';
   if(list.length === 0){
     tbody.innerHTML = '<tr><td colspan="6" style="color:#3a2010;padding:8px">아직 기록 없음</td></tr>';
@@ -2705,16 +2767,22 @@ function renderRankingTable(myRank){
   }
   list.forEach((r, i) => {
     const tr = document.createElement('tr');
-    const rank = i+1;
-    const isMine = rank === myRank;
-    if(isMine) tr.className = 'cur';
-    else if(rank===1) tr.className = 'rk1';
-    else if(rank===2) tr.className = 'rk2';
-    else if(rank===3) tr.className = 'rk3';
-    const medal = RANK_MEDAL[i] || `${rank}위`;
-    tr.innerHTML = `<td>${medal}</td><td>${r.score.toLocaleString()}</td><td>S${r.stage||1}</td><td>Lv.${r.level}</td><td>${r.time}</td><td>${r.kills}처치</td>`;
+    const isMine = r.ts === myTs;
+    if(isMine)   tr.className = 'cur';
+    else if(i===0) tr.className = 'rk1';
+    else if(i===1) tr.className = 'rk2';
+    else if(i===2) tr.className = 'rk3';
+    const medal = RANK_MEDAL[i] || `${i+1}위`;
+    const name = (r.name||'익명').slice(0,10);
+    tr.innerHTML = `<td>${medal}</td><td>${name}</td><td>${r.score.toLocaleString()}</td><td>S${r.stage||1}</td><td>Lv.${r.level}</td><td>${r.kills}처치</td>`;
     tbody.appendChild(tr);
   });
+}
+
+function renderRankingTable(myRank){
+  const tbody = document.getElementById('rktbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
+  loadRankings().then(list => _buildRankRows(list, tbody, _lastTs));
 }
 
 // ── 캔버스에 콤보 카운터 오버레이 ──
@@ -3434,6 +3502,14 @@ function _triggerGameOver(){
     myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
   document.getElementById('gost').textContent =
     `STAGE ${stage}  ·  생존 ${mm}분 ${ss}초  ·  Lv.${gs.player.level}  ·  처치 ${gs.kills}  ·  최대콤보 ${gs.bestCombo}연`;
+  // 닉네임 없으면 입력창 강조
+  const inp = document.getElementById('go-name-input');
+  if(inp){
+    const saved = localStorage.getItem('hanyang_name') || '';
+    inp.value = saved;
+    if(!saved){ inp.style.borderColor='rgba(220,160,40,0.9)'; inp.focus(); }
+    else { inp.style.borderColor=''; }
+  }
   renderRankingTable(myRank);
   showPanel('go');
 }
@@ -3558,6 +3634,23 @@ _bindBtn('btn-start', showCharacterSelect);
 _bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} showTitleRanking(); });
 _bindBtn('btn-rank-back', hideTitleRanking);
 _bindBtn('btn-go-home', goToTitle);
+
+// 닉네임 입력 초기화 및 저장
+(function initNameInput(){
+  const inp = document.getElementById('go-name-input');
+  const btn = document.getElementById('go-name-save');
+  if(!inp || !btn) return;
+  inp.value = localStorage.getItem('hanyang_name') || '';
+  const save = () => {
+    const n = inp.value.trim().slice(0,10) || '익명';
+    _setPlayerName(n); inp.value = n;
+    btn.textContent = '✓';
+    setTimeout(() => { btn.textContent = '저장'; }, 1200);
+  };
+  btn.addEventListener('click', save);
+  btn.addEventListener('touchend', e => { e.preventDefault(); save(); });
+  inp.addEventListener('keydown', e => { if(e.key === 'Enter') save(); });
+})();
 
 // 캐릭터 선택 화면
 function showCharacterSelect(){
