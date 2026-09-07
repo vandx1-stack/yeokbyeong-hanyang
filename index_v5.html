@@ -2773,9 +2773,10 @@ async function saveRanking(score, level, time, kills, stageNum){
   };
   _saveLocal(entry);
 
+  let ghOk = false;
   try {
     const content = btoa(JSON.stringify(entry));
-    await fetch(`${GH_SCORES}${_lastTs}.json`, {
+    const putRes = await fetch(`${GH_SCORES}${_lastTs}.json`, {
       method: 'PUT',
       headers: {
         'Authorization': `token ${GH_TOKEN}`,
@@ -2783,9 +2784,18 @@ async function saveRanking(score, level, time, kills, stageNum){
       },
       body: JSON.stringify({ message: `score:${score}`, content })
     });
-  } catch(e) { /* 오프라인 시 로컬만 저장 */ }
+    if(putRes.ok){ ghOk = true; }
+    else { console.warn('[rank] save PUT failed:', putRes.status, putRes.statusText); }
+  } catch(e) { console.warn('[rank] save fetch error:', e); }
 
-  // 전체 랭킹에서 내 순위 계산 (로컬 기준)
+  // 순위: GitHub 성공 시 전체 목록 기준, 실패 시 로컬 기준
+  if(ghOk){
+    try {
+      const global = await loadRankings();
+      const gi = global.findIndex(r => r.ts === _lastTs);
+      if(gi >= 0) return gi + 1;
+    } catch(_){}
+  }
   const local = _loadLocal();
   return local.findIndex(r => r.ts === _lastTs) + 1;
 }
@@ -2795,9 +2805,12 @@ async function loadRankings(){
   try {
     const listRes = await fetch(GH_SCORES, {
       headers: { 'Authorization': `token ${GH_TOKEN}` },
-      signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+      signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
     });
-    if(!listRes.ok) throw new Error();
+    if(!listRes.ok){
+      console.warn('[rank] list fetch failed:', listRes.status, listRes.statusText);
+      throw new Error('list fetch ' + listRes.status);
+    }
     const files = await listRes.json();
     if(!Array.isArray(files) || files.length === 0) return _loadLocal();
 
@@ -2818,6 +2831,7 @@ async function loadRankings(){
     list.sort((a,b) => b.score - a.score);
     return list.slice(0, 1000);
   } catch(e) {
+    console.warn('[rank] loadRankings fallback to local:', e);
     return _loadLocal();
   }
 }
