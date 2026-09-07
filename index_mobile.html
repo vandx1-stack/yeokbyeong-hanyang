@@ -339,14 +339,16 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
   position:absolute;bottom:22px;font-size:9px;letter-spacing:2px;color:#5a3820;
 }
 
-/* ════════════════════════ 닉네임 표시 (게임플레이 중 우상단) ════════════════════════ */
-#play-nickname{position:absolute;top:8px;right:8px;
+/* ════════════════════════ 일시정지 버튼 ════════════════════════ */
+#play-nickname{position:absolute;top:8px;right:8px;width:44px;height:44px;
   background:rgba(15,6,1,0.85);border:1px solid rgba(80,35,8,0.7);border-radius:4px;
-  color:#a86020;font-size:10px;letter-spacing:1px;padding:5px 8px;
+  color:#a86020;font-size:14px;
   pointer-events:auto;z-index:300;cursor:pointer;font-family:inherit;
-  display:none;align-items:center;gap:4px;white-space:nowrap;
+  display:none;align-items:center;justify-content:center;
   transition:background .12s,border-color .12s,color .12s;}
 #play-nickname:hover{background:rgba(50,20,3,0.98);border-color:rgba(160,80,20,.9);color:#f0a840;}
+/* ════════════════════════ 타이틀 닉네임 표시 ════════════════════════ */
+#title-nick{font-size:10px;color:#6a4020;letter-spacing:2px;margin-top:10px;text-align:center;}
 /* ════════════════════════ 일시정지 오버레이 ════════════════════════ */
 #pause-overlay{position:absolute;top:8px;left:8px;
   background:linear-gradient(180deg,rgba(14,7,1,0.90),rgba(8,4,1,0.95));
@@ -393,7 +395,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 </div>
 <div id="gw">
 <canvas id="c"></canvas>
-<div id="play-nickname" title="일시정지">👤 <span id="play-nick-txt"></span></div>
+<div id="play-nickname" title="일시정지">⏸</div>
 <div id="touch-hint" class="hid">← 왼쪽 드래그로 이동</div>
 <div id="pause-overlay" class="hid">
   <div class="ptxt">일시정지</div>
@@ -444,6 +446,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
     <button class="tbtn" id="btn-start">시  작</button>
     <button class="tbtn" id="btn-rank">랭  킹</button>
   </div>
+  <div id="title-nick"></div>
   <div class="tctl">화면 <b>드래그</b> 이동 · <b>자동</b> 공격</div>
   <div id="ath-hint" style="display:none;margin-top:8px;font-size:9px;color:#8a6030;letter-spacing:0.5px;text-align:center;line-height:1.5;">
     전체화면: Safari 하단 <b style="color:#c89040">공유(□↑)</b> → <b style="color:#c89040">홈 화면에 추가</b>
@@ -940,6 +943,7 @@ function goToTitle(){
   _setPause(false);
   hideHUD();
   showPanel('ts');
+  _updateTitleNick();
 }
 
 // ── HUD 업데이트 (매 프레임) ─────────────────────────────────────
@@ -2320,22 +2324,27 @@ function _updateStageAEmbers(dt){
 }
 
 let _paused = false;
-const _pauseOverlay  = document.getElementById('pause-overlay');
-const _playNickEl    = document.getElementById('play-nickname');
-const _playNickTxt   = document.getElementById('play-nick-txt');
+const _pauseOverlay = document.getElementById('pause-overlay');
+const _pauseBtn     = document.getElementById('play-nickname');
 
 function _setPause(on){
   _paused = on;
+  _pauseBtn.textContent = on ? '▶' : '⏸';
   _pauseOverlay.classList.toggle('hid', !on);
 }
 function _showPauseBtn(show){
-  _playNickEl.style.display = show ? 'flex' : 'none';
-  if(show) _playNickTxt.textContent = _playerName();
+  _pauseBtn.style.display = show ? 'flex' : 'none';
 }
-_playNickEl.addEventListener('click', ()=>{
+function _updateTitleNick(){
+  const el = document.getElementById('title-nick');
+  if(!el) return;
+  const n = localStorage.getItem('hanyang_name');
+  el.textContent = n ? `👤 ${n}` : '';
+}
+_pauseBtn.addEventListener('click', ()=>{
   if(phase === 'playing') _setPause(!_paused);
 });
-_playNickEl.addEventListener('touchend', e=>{
+_pauseBtn.addEventListener('touchend', e=>{
   e.preventDefault(); e.stopPropagation();
   if(phase === 'playing') _setPause(!_paused);
 });
@@ -3643,6 +3652,7 @@ function _bindBtn(id, fn){
   el.addEventListener('click', e=>{ e.stopPropagation(); fn(); });
   el.addEventListener('touchend', e=>{ e.preventDefault(); e.stopPropagation(); fn(); });
 }
+_updateTitleNick();
 _bindBtn('btn-start', showCharacterSelect);
 _bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} showTitleRanking(); });
 _bindBtn('btn-rank-back', hideTitleRanking);
@@ -5985,6 +5995,7 @@ requestAnimationFrame(tick);
     const confirmName = () => {
       const n = (nameInp ? nameInp.value.trim().slice(0,10) : '') || '익명';
       _setPlayerName(n);
+      _updateTitleNick();
       if(nameWrap) nameWrap.style.display = 'none';
       if(tapBtn)   tapBtn.style.display   = '';
       // 저장 후 바로 게임 시작할 수 있도록 dismiss에 이벤트 연결
