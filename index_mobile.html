@@ -2478,24 +2478,28 @@ function updateSwordsmanCombat(dt){
   p.slashTimer -= dt;
   if(p.slashTimer > 0) return;
 
+  // 공격 범위 내 살아있는 좀비 탐색
+  const R = p.slashRadius + 40;
+  let nz = null, nd = Infinity;
+  for(const z of gs.zombies){
+    if(z.dead) continue;
+    const d = Math.hypot(z.x-p.x, z.y-p.y);
+    if(d < nd){ nd = d; nz = z; }
+  }
+
+  // 범위 내 좀비 없으면 공격 스킵 (짧은 간격으로 재탐색)
+  if(!nz || nd > R){
+    p.slashTimer = 0.08;
+    return;
+  }
+
   // 참격 방향 결정
   const spd = Math.hypot(p.vx, p.vy);
   let angle;
   if(spd > 12){
     angle = Math.atan2(p.vy, p.vx); // 이동 방향
   } else {
-    // 정지 시: 근처 좀비 자동 조준
-    let nz = null, nd = Infinity;
-    for(const z of gs.zombies){
-      if(z.dead) continue;
-      const d = Math.hypot(z.x-p.x, z.y-p.y);
-      if(d < nd){ nd = d; nz = z; }
-    }
-    if(nz && nd < p.slashRadius + 40){
-      angle = Math.atan2(nz.y - p.y, nz.x - p.x);
-    } else {
-      angle = p.facingRight ? 0 : Math.PI;
-    }
+    angle = Math.atan2(nz.y - p.y, nz.x - p.x); // 정지 시: 최근접 좀비 조준
   }
   performSlash(p, angle);
   p.slashTimer = Math.max(0.10, 1 / p.slashRate);
