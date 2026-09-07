@@ -781,6 +781,7 @@ const touchMove = { active: false, id: -1, baseX: 0, baseY: 0, curX: 0, curY: 0 
 const TOUCH_MAX = 80; // 드래그 최대 반경
 let isTouchDevice = false;
 let _dbgStartCount = 0; // onTouchStart 호출 횟수
+let _dbgMoveCount = 0;  // onTouchMove 호출 횟수
 
 // 전체화면 요청 (첫 터치 시 1회)
 let _fsRequested = false;
@@ -829,6 +830,7 @@ function onTouchStart(e){
 
 function onTouchMove(e){
   e.preventDefault();
+  _dbgMoveCount++;
   for(const t of e.changedTouches){
     if(t.identifier === touchMove.id){
       const g = clientToGame(t.clientX, t.clientY);
@@ -862,10 +864,10 @@ function updateTouchInput(){
 }
 
 // 캔버스에 터치 이벤트 연결
-wrapper.addEventListener('touchstart', onTouchStart, {passive:false});
-wrapper.addEventListener('touchmove',  onTouchMove,  {passive:false});
-wrapper.addEventListener('touchend',   onTouchEnd,   {passive:false});
-wrapper.addEventListener('touchcancel',onTouchEnd,   {passive:false});
+wrapper.addEventListener('touchstart',  onTouchStart, {passive:false});
+document.addEventListener('touchmove',  onTouchMove,  {passive:false});  // document로 변경: iOS wrapper 버블링 미비 대응
+wrapper.addEventListener('touchend',    onTouchEnd,   {passive:false});
+wrapper.addEventListener('touchcancel', onTouchEnd,   {passive:false});
 
 // 터치 방향 힌트 렌더링 (반투명 화살표만, UI 없음)
 function drawJoystick(){
@@ -3720,20 +3722,23 @@ function draw(){
     ctx.restore();
   }
   // ── 터치 디버그 오버레이 (개발용 — 문제 확인 후 삭제) ──────────────
-  if(isTouchDevice || _dbgStartCount > 0){
+  {
     ctx.save();
     ctx.font = 'bold 13px monospace';
     ctx.textBaseline = 'top';
+    const ddx = (touchMove.curX - touchMove.baseX).toFixed(0);
+    const ddy = (touchMove.curY - touchMove.baseY).toFixed(0);
     const lines = [
-      `[DBG] starts:${_dbgStartCount} dev:${isTouchDevice}`,
+      `[DBG] phase:${phase}`,
+      `starts:${_dbgStartCount} moves:${_dbgMoveCount}`,
       `active:${touchMove.active} id:${touchMove.id}`,
-      `dx:${touchInput.dx.toFixed(2)} dy:${touchInput.dy.toFixed(2)}`,
+      `delta:${ddx},${ddy}  inp:${touchInput.dx.toFixed(2)},${touchInput.dy.toFixed(2)}`,
     ];
     lines.forEach((ln, i) => {
-      ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(6, 6 + i*17, ctx.measureText(ln).width + 8, 15);
+      ctx.fillStyle = 'rgba(0,0,0,0.70)';
+      ctx.fillRect(4, 4 + i*17, ctx.measureText(ln).width + 8, 15);
       ctx.fillStyle = '#0f0';
-      ctx.fillText(ln, 10, 8 + i*17);
+      ctx.fillText(ln, 8, 6 + i*17);
     });
     ctx.restore();
   }
