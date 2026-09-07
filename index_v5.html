@@ -106,7 +106,10 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 #title-rank{background:rgba(2,1,0,0.92);height:450px;z-index:20;}
 .trk-hd{font-size:18px;font-weight:900;color:#c8a030;letter-spacing:4px;margin-bottom:14px;
   text-shadow:0 0 14px rgba(180,120,0,.4);}
-#trk-wrap{width:480px;max-height:240px;overflow:hidden;margin-bottom:20px;}
+#trk-wrap{width:480px;max-height:320px;overflow-y:auto;overflow-x:hidden;margin-bottom:20px;
+  scrollbar-width:thin;scrollbar-color:rgba(160,80,20,.4) transparent;}
+#trk-wrap::-webkit-scrollbar{width:4px;}
+#trk-wrap::-webkit-scrollbar-thumb{background:rgba(160,80,20,.4);border-radius:2px;}
 .tbtnwrap{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
 .tbtn{
   width:160px;padding:9px 0;
@@ -212,7 +215,10 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 #goscore{font-size:26px;font-weight:900;color:#d4a020;letter-spacing:2px;font-family:monospace;
   margin-bottom:2px;text-shadow:0 0 20px rgba(200,140,0,.50),0 1px 3px rgba(0,0,0,.9);}
 #gorank{font-size:10px;color:#7a4a18;letter-spacing:1.5px;margin-bottom:4px;}
-#gorankwrap{width:460px;max-height:130px;overflow:hidden;margin-bottom:6px;}
+#gorankwrap{width:460px;max-height:160px;overflow-y:auto;overflow-x:hidden;margin-bottom:6px;
+  scrollbar-width:thin;scrollbar-color:rgba(160,80,20,.4) transparent;}
+#gorankwrap::-webkit-scrollbar{width:4px;}
+#gorankwrap::-webkit-scrollbar-thumb{background:rgba(160,80,20,.4);border-radius:2px;}
 #gost{font-size:9px;color:#5a3820;letter-spacing:.6px;margin-bottom:8px;font-family:monospace;
   padding:4px 12px;background:rgba(0,0,0,.4);border:1px solid rgba(60,25,5,.5);border-radius:1px;}
 .gorst{font-size:12px;font-weight:700;color:#886015;animation:blt 2s ease infinite alternate;letter-spacing:2px;}
@@ -2785,16 +2791,22 @@ async function loadRankings(){
     const files = await listRes.json();
     if(!Array.isArray(files) || files.length === 0) return _loadLocal();
 
-    // 최근 200개 파일만 (파일명이 timestamp이므로 내림차순 = 최신)
-    const targets = files.sort((a,b) => b.name.localeCompare(a.name)).slice(0, 200);
-    const results = await Promise.allSettled(
-      targets.map(f => fetch(GH_RAW + f.name).then(r => r.json()))
-    );
-    const list = results
-      .filter(r => r.status === 'fulfilled' && r.value && r.value.score)
-      .map(r => r.value);
+    // 최대 1000개 파일 (파일명이 timestamp이므로 내림차순 = 최신)
+    const targets = files.sort((a,b) => b.name.localeCompare(a.name)).slice(0, 1000);
+    // 50개씩 나눠 병렬 fetch (한번에 1000개 요청 방지)
+    const CHUNK = 50;
+    const list = [];
+    for(let i = 0; i < targets.length; i += CHUNK){
+      const chunk = targets.slice(i, i + CHUNK);
+      const results = await Promise.allSettled(
+        chunk.map(f => fetch(GH_RAW + f.name).then(r => r.json()))
+      );
+      for(const r of results){
+        if(r.status === 'fulfilled' && r.value && r.value.score) list.push(r.value);
+      }
+    }
     list.sort((a,b) => b.score - a.score);
-    return list.slice(0, 20);
+    return list.slice(0, 1000);
   } catch(e) {
     return _loadLocal();
   }
@@ -2824,7 +2836,12 @@ function _buildRankRows(list, tbody, myTs){
 function renderRankingTable(myRank){
   const tbody = document.getElementById('rktbody');
   tbody.innerHTML = '<tr><td colspan="6" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
-  loadRankings().then(list => _buildRankRows(list, tbody, _lastTs));
+  loadRankings().then(list => {
+    _buildRankRows(list, tbody, _lastTs);
+    // 내 행이 보이도록 스크롤
+    const myRow = tbody.querySelector('tr.cur');
+    if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 100);
+  });
 }
 
 // ── 캔버스에 콤보 카운터 오버레이 ──
