@@ -339,15 +339,16 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
   position:absolute;bottom:22px;font-size:9px;letter-spacing:2px;color:#5a3820;
 }
 
-/* 일시정지 버튼 */
-/* ════════════════════════ 일시정지 ════════════════════════ */
-#pause-btn{position:absolute;top:8px;right:8px;width:44px;height:44px;
+/* ════════════════════════ 닉네임 표시 (게임플레이 중 우상단) ════════════════════════ */
+#play-nickname{position:absolute;top:8px;right:8px;
   background:rgba(15,6,1,0.85);border:1px solid rgba(80,35,8,0.7);border-radius:4px;
-  color:#a86020;font-size:14px;cursor:pointer;pointer-events:auto;
-  display:flex;align-items:center;justify-content:center;z-index:300;
+  color:#a86020;font-size:10px;letter-spacing:1px;padding:5px 8px;
+  pointer-events:auto;z-index:300;cursor:pointer;font-family:inherit;
+  display:none;align-items:center;gap:4px;white-space:nowrap;
   transition:background .12s,border-color .12s,color .12s;}
-#pause-btn:hover{background:rgba(50,20,3,0.98);border-color:rgba(160,80,20,.9);color:#f0a840;}
-#pause-overlay{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+#play-nickname:hover{background:rgba(50,20,3,0.98);border-color:rgba(160,80,20,.9);color:#f0a840;}
+/* ════════════════════════ 일시정지 오버레이 ════════════════════════ */
+#pause-overlay{position:absolute;top:8px;left:8px;
   background:linear-gradient(180deg,rgba(14,7,1,0.90),rgba(8,4,1,0.95));
   border:1px solid rgba(120,60,12,0.6);border-radius:4px;
   padding:7px 24px 10px;pointer-events:auto;z-index:299;
@@ -392,12 +393,12 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 </div>
 <div id="gw">
 <canvas id="c"></canvas>
-<button id="pause-btn" class="hid" title="일시정지">⏸</button>
+<div id="play-nickname" title="일시정지">👤 <span id="play-nick-txt"></span></div>
 <div id="touch-hint" class="hid">← 왼쪽 드래그로 이동</div>
 <div id="pause-overlay" class="hid">
   <div class="ptxt">일시정지</div>
-  <div class="presume">⏸ 버튼을 다시 눌러 계속</div>
-  <button id="pause-home-btn">메인화면</button>
+  <div class="presume">닉네임을 다시 눌러 계속</div>
+  <button id="pause-home-btn">게임종료</button>
 </div>
 
 <!-- HUD -->
@@ -462,12 +463,13 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 </div>
 
 <!-- Character Select -->
-<div id="cs" class="gp hid">
+<div id="cs" class="gp hid" style="position:relative;">
+  <button class="tbtn go-home-btn" id="btn-cs-back"
+    style="position:absolute;top:8px;left:8px;width:80px;min-height:36px;font-size:10px;letter-spacing:2px;">← 뒤로</button>
   <div class="panel-box">
     <div class="panel-rule"></div>
     <div class="cs-tit">캐릭터 선택</div>
     <div class="cs-sub">그대의 무기를 택하시오</div>
-    <button class="tbtn go-home-btn" id="btn-cs-back" style="margin-bottom:8px;">← 뒤로</button>
     <div class="cs-grid">
       <div class="cs-card" data-char="priest">
         <div class="cs-portrait"><canvas class="cs-portrait-cv" width="88" height="88" data-src="player"></canvas></div>
@@ -2318,21 +2320,22 @@ function _updateStageAEmbers(dt){
 }
 
 let _paused = false;
-const _pauseOverlay = document.getElementById('pause-overlay');
-const _pauseBtn     = document.getElementById('pause-btn');
+const _pauseOverlay  = document.getElementById('pause-overlay');
+const _playNickEl    = document.getElementById('play-nickname');
+const _playNickTxt   = document.getElementById('play-nick-txt');
 
 function _setPause(on){
   _paused = on;
-  _pauseBtn.textContent = on ? '▶' : '⏸';
   _pauseOverlay.classList.toggle('hid', !on);
 }
 function _showPauseBtn(show){
-  _pauseBtn.classList.toggle('hid', !show);
+  _playNickEl.style.display = show ? 'flex' : 'none';
+  if(show) _playNickTxt.textContent = _playerName();
 }
-_pauseBtn.addEventListener('click', ()=>{
+_playNickEl.addEventListener('click', ()=>{
   if(phase === 'playing') _setPause(!_paused);
 });
-_pauseBtn.addEventListener('touchend', e=>{
+_playNickEl.addEventListener('touchend', e=>{
   e.preventDefault(); e.stopPropagation();
   if(phase === 'playing') _setPause(!_paused);
 });
