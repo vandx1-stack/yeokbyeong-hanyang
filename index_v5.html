@@ -26,7 +26,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
   border-top:1px solid rgba(180,90,20,0.45);
   box-shadow:0 -2px 18px rgba(0,0,0,0.75), inset 0 1px 0 rgba(220,120,30,0.10);
   display:flex;align-items:center;gap:0;padding:0 10px;
-  pointer-events:none;font-size:0;
+  pointer-events:none;font-size:0;z-index:15;
 }
 #hud.hid{display:none!important;}
 .hsp{flex:1;}
@@ -80,8 +80,8 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 #statpanel{flex:1;display:flex;flex-wrap:wrap;align-content:center;gap:2px 4px;padding:0 8px;min-width:0;}
 .stchip{display:flex;align-items:center;gap:2px;background:rgba(0,0,0,0.60);
   border:1px solid rgba(70,40,8,0.65);border-radius:2px;padding:1px 4px;white-space:nowrap;}
-.stchip .sl{font-size:6.5px;color:#6a4a20;letter-spacing:.2px;}
-.stchip .sv{font-size:8px;font-weight:900;font-family:monospace;color:#d09828;}
+.stchip .sl{font-size:8px;color:#a07840;letter-spacing:.2px;}
+.stchip .sv{font-size:9.5px;font-weight:900;font-family:monospace;color:#d09828;}
 .stchip.atk .sv{color:#e04838;}.stchip.crit .sv{color:#f07030;}
 .stchip.spd .sv{color:#30b8d8;}.stchip.hp  .sv{color:#40d860;}
 .stchip.fire .sv{color:#f05818;}.stchip.life .sv{color:#c030a0;}
@@ -2596,7 +2596,7 @@ function updatePlayer(dt){
     else                       p.animState = 'idle';
     if(p.animState !== prevPState) p.animClock = 0;
     p.animClock += dt;
-    if(p.animState === 'walk')       p.animFrame = Math.floor(p.animClock * 6) % 2;
+    if(p.animState === 'walk')       p.animFrame = Math.floor(p.animClock * 6) % (p.weapon === 'slash' ? 4 : 2);
     else if(p.animState === 'idle')  p.animFrame = Math.floor(p.animClock * 2) % 2;
     else                             p.animFrame = 0;
   }
@@ -5762,7 +5762,7 @@ function drawPlayer_(){
   //         JS 부채꼴 파란 궤적이 별도 렌더되므로 VFX 손실 없음
   const P_FRAMES_SWORD = {
     idle:   [[0,0]],
-    walk:   [[1,0],[2,0]],
+    walk:   [[0,0],[1,0],[2,0],[1,0]],
     attack: [[3,0],[0,1]],   // 검뽑고 대기 ↔ 검 옆으로 뻗기 (교차)
     hit:    [[0,2]],
     death:  [[0,2],[3,2]],
