@@ -103,6 +103,15 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 
 /* ════════════════════════ 타이틀 ════════════════════════ */
 #ts{background:transparent;height:450px;}
+#btn-mute{
+  position:absolute;bottom:12px;right:14px;
+  background:rgba(20,8,2,0.72);border:1px solid rgba(160,80,20,0.45);
+  border-radius:3px;color:#c8a030;font-size:16px;
+  width:32px;height:32px;line-height:32px;text-align:center;
+  cursor:pointer;pointer-events:all;
+  transition:border-color .12s,background .12s;
+}
+#btn-mute:hover{border-color:rgba(220,140,40,0.8);background:rgba(60,24,4,0.88);}
 #title-rank{background:rgba(2,1,0,0.92);height:450px;z-index:20;}
 .trk-hd{font-size:18px;font-weight:900;color:#c8a030;letter-spacing:4px;margin-bottom:14px;
   text-shadow:0 0 14px rgba(180,120,0,.4);}
@@ -282,31 +291,41 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 .tbtn.go-home-btn{min-height:36px;}
 
 /* ════════════════════════ 캐릭터 선택 ════════════════════════ */
-#cs{background:rgba(0,0,0,.90);height:450px;justify-content:center;}
-#cs .panel-box{min-width:640px;padding:16px 30px 14px;}
-.cs-tit{font-size:22px;font-weight:900;color:#d8aa28;letter-spacing:6px;margin-bottom:2px;
-  text-shadow:0 0 18px rgba(200,150,0,.45);}
-.cs-tit::before,.cs-tit::after{content:'—';color:rgba(160,100,20,.5);margin:0 10px;font-size:14px;}
-.cs-sub{font-size:10px;color:rgba(160,120,60,.75);margin-bottom:14px;letter-spacing:2px;}
-.cs-grid{display:flex;gap:16px;justify-content:center;}
-.cs-card{
-  width:260px;padding:12px 14px 14px;
-  background:linear-gradient(135deg,rgba(36,20,4,.98)0%,rgba(16,8,1,.99)100%);
-  border:1px solid rgba(140,90,18,.45);border-top:3px solid rgba(180,110,22,.60);
-  border-radius:3px;cursor:pointer;pointer-events:all;
-  display:flex;flex-direction:column;align-items:center;gap:4px;
-  transition:border-color .12s,transform .12s,box-shadow .12s;
-  box-shadow:0 2px 12px rgba(0,0,0,.6);
+#cs{
+  background:radial-gradient(ellipse at 50% 25%,rgba(28,12,2,0.98)0%,rgba(3,1,0,1)70%);
+  height:450px;justify-content:center;align-items:center;flex-direction:column;gap:0;
 }
-.cs-card:hover{border-color:rgba(220,160,40,.85);border-top-color:rgba(240,180,50,.95);
-  transform:translateY(-3px);box-shadow:0 4px 22px rgba(160,100,0,.30),0 0 30px rgba(200,140,0,.18);}
-.cs-portrait{width:88px;height:88px;background:radial-gradient(circle at 50% 55%,rgba(20,10,2,0.8)0%,rgba(0,0,0,0.95)80%);
-  border:1px solid rgba(120,80,15,0.5);border-radius:50%;overflow:hidden;position:relative;margin-bottom:2px;}
-.cs-portrait canvas{position:absolute;top:0;left:0;}
-.cs-name{font-size:18px;font-weight:900;color:#e0b830;letter-spacing:3px;text-shadow:0 0 10px rgba(200,140,0,.35);}
-.cs-weapon{font-size:9px;color:#8090b8;letter-spacing:2px;font-weight:700;margin-bottom:3px;}
-.cs-desc{font-size:9.5px;color:rgba(190,155,85,.85);text-align:center;line-height:1.5;}
-.cs-hint{font-size:8px;color:rgba(140,105,50,.80);margin-top:4px;letter-spacing:1px;}
+.cs-header{text-align:center;margin-bottom:10px;}
+.cs-tit{font-size:20px;font-weight:900;color:#d8aa28;letter-spacing:6px;
+  text-shadow:0 0 18px rgba(200,150,0,.55);}
+.cs-tit::before,.cs-tit::after{content:'—';color:rgba(160,100,20,.45);margin:0 8px;font-size:13px;}
+.cs-sub{font-size:9px;color:rgba(155,115,55,.68);letter-spacing:2px;margin-top:3px;}
+.cs-grid{display:flex;gap:14px;justify-content:center;align-items:flex-start;}
+.cs-card{
+  width:206px;
+  background:linear-gradient(170deg,rgba(26,12,1,0.97)0%,rgba(8,3,0,0.99)100%);
+  border:1px solid rgba(110,72,12,.38);border-top:2px solid rgba(170,105,20,.52);
+  border-radius:4px;cursor:pointer;pointer-events:all;
+  display:flex;flex-direction:column;align-items:center;
+  transition:border-color .14s,transform .14s,box-shadow .14s;
+  box-shadow:0 2px 18px rgba(0,0,0,.75);overflow:hidden;
+}
+.cs-card:hover{
+  border-color:rgba(230,170,40,.88);border-top-color:rgba(250,190,55,.98);
+  transform:translateY(-5px);
+  box-shadow:0 8px 32px rgba(180,110,0,.38),0 0 44px rgba(220,150,0,.22);
+}
+.cs-preview-wrap{
+  width:206px;height:216px;position:relative;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 85%,rgba(55,28,4,0.22)0%,rgba(0,0,0,0)68%);
+}
+.cs-preview-wrap canvas{position:absolute;top:0;left:0;width:100%;height:100%;image-rendering:pixelated;}
+.cs-info{padding:7px 12px 11px;width:100%;box-sizing:border-box;text-align:center;}
+.cs-name{font-size:17px;font-weight:900;color:#e2ba34;letter-spacing:3px;
+  text-shadow:0 0 10px rgba(200,140,0,.38);}
+.cs-weapon{font-size:8px;color:#7080a8;letter-spacing:2px;font-weight:700;margin:3px 0 5px;}
+.cs-desc{font-size:9px;color:rgba(185,148,75,.80);line-height:1.6;}
+.cs-hint{font-size:7.5px;color:rgba(125,90,38,.65);margin-top:5px;letter-spacing:1px;}
 
 /* ════════════════════════ 시작 스플래시 ════════════════════════ */
 #splash{
@@ -468,6 +487,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
   <div id="ath-hint" style="display:none;margin-top:8px;font-size:9px;color:#8a6030;letter-spacing:0.5px;text-align:center;line-height:1.5;">
     전체화면: Safari 하단 <b style="color:#c89040">공유(□↑)</b> → <b style="color:#c89040">홈 화면에 추가</b>
   </div>
+  <button id="btn-mute" title="음소거 토글">🔊</button>
 </div>
 
 <!-- Title Ranking Modal -->
@@ -475,7 +495,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
   <div class="trk-hd">🌐 전체 랭킹</div>
   <div id="trk-wrap">
     <table class="rktbl">
-      <thead><tr><th>순위</th><th>이름</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead>
+      <thead><tr><th>순위</th><th>이름</th><th>직업</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead>
       <tbody id="trk-body"></tbody>
     </table>
   </div>
@@ -486,34 +506,44 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
 <div id="cs" class="gp hid" style="position:relative;">
   <button class="tbtn go-home-btn" id="btn-cs-back"
     style="position:absolute;top:8px;left:8px;width:80px;min-height:36px;font-size:10px;letter-spacing:2px;">← 뒤로</button>
-  <div class="panel-box">
-    <div class="panel-rule"></div>
+  <div class="cs-header">
     <div class="cs-tit">캐릭터 선택</div>
     <div class="cs-sub">그대의 무기를 택하시오</div>
-    <div class="cs-grid">
-      <div class="cs-card" data-char="priest">
-        <div class="cs-portrait"><canvas class="cs-portrait-cv" width="88" height="88" data-src="player"></canvas></div>
+  </div>
+  <div class="cs-grid">
+    <div class="cs-card" data-char="priest">
+      <div class="cs-preview-wrap">
+        <canvas class="cs-cv" data-char="priest" width="412" height="432"></canvas>
+      </div>
+      <div class="cs-info">
         <div class="cs-name">여도사</div>
         <div class="cs-weapon">회전 부적술</div>
         <div class="cs-desc">주변을 도는 부적이<br>자동으로 적을 타격</div>
         <div class="cs-hint">터치하여 선택</div>
       </div>
-      <div class="cs-card" data-char="swordsman">
-        <div class="cs-portrait"><canvas class="cs-portrait-cv" width="88" height="88" data-src="player_sword"></canvas></div>
+    </div>
+    <div class="cs-card" data-char="swordsman">
+      <div class="cs-preview-wrap">
+        <canvas class="cs-cv" data-char="swordsman" width="412" height="432"></canvas>
+      </div>
+      <div class="cs-info">
         <div class="cs-name">검객</div>
         <div class="cs-weapon">이동 참격술</div>
         <div class="cs-desc">이동 방향으로 검을 휘둘러<br>광역 참격을 가함</div>
         <div class="cs-hint">터치하여 선택</div>
       </div>
-      <div class="cs-card" data-char="archer">
-        <div class="cs-portrait"><canvas class="cs-portrait-cv" width="88" height="88" data-src="player_archer"></canvas></div>
+    </div>
+    <div class="cs-card" data-char="archer">
+      <div class="cs-preview-wrap">
+        <canvas class="cs-cv" data-char="archer" width="412" height="432"></canvas>
+      </div>
+      <div class="cs-info">
         <div class="cs-name">궁수</div>
         <div class="cs-weapon">직선 화살 사격</div>
         <div class="cs-desc">같은 선상의 적을 향해<br>화살을 자동으로 발사</div>
         <div class="cs-hint">터치하여 선택</div>
       </div>
     </div>
-    <div class="panel-rule"></div>
   </div>
 </div>
 
@@ -555,7 +585,7 @@ html,body{width:100%;height:100%;min-height:100dvh;background:#010002;display:fl
     <div id="goscore">0</div>
     <div id="gorank"></div>
     <div id="gost"></div>
-    <div id="gorankwrap"><table class="rktbl"><thead><tr><th>순위</th><th>이름</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead><tbody id="rktbody"></tbody></table></div>
+    <div id="gorankwrap"><table class="rktbl"><thead><tr><th>순위</th><th>이름</th><th>직업</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead><tbody id="rktbody"></tbody></table></div>
     <div class="gobtnwrap">
       <div class="gorst">터치하여 재도전</div>
       <button class="tbtn go-home-btn" id="btn-go-home">메인화면</button>
@@ -577,7 +607,7 @@ let spritesReady = false;
   const defs = {
     player:       'assets/PC_여도사.png',
     player_sword: 'assets/PC_검객.png',
-    player_archer:'assets/PC_여궁수.png',
+    player_archer:'assets/PC_여궁수_2.png',
     z_normal:   'assets/NPC_근접좀비.png',
     z_runner:   'assets/NPC_돌진좀비.png',
     z_archer:   'assets/NPC_원거리좀비.png',
@@ -623,6 +653,12 @@ function drawSprite(key, cx, cy, targetH, facingRight, alpha, flash, extraFilter
   ctx.restore();
 }
 
+// 실제 측정된 행 시작 Y좌표 테이블 (셀 높이를 넘어 발이 잘리는 시트 보정용)
+// 값: [row0_start, row1_start, row2_start] (픽셀 단위, 실측값)
+const SPRITE_ROW_YS = {
+  player_archer: [0, 430, 752],  // 행0 발이 y=395까지 블리드, 행1은 y=430부터 시작
+};
+
 // 스프라이트시트 1프레임 그리기
 // cx, cy = 발 기준점(하단 중앙). totalCols/Rows = 시트 격자 수.
 function drawSpriteSheet(key, col, row, totalCols, totalRows, cx, cy, targetH, facingRight, alpha, frameFlip){
@@ -630,13 +666,16 @@ function drawSpriteSheet(key, col, row, totalCols, totalRows, cx, cy, targetH, f
   if(!img || !img.naturalWidth) return;
   const fw = img.naturalWidth  / totalCols;
   const fh = img.naturalHeight / totalRows;
-  // 소스 좌표 정수화 (sub-pixel 번짐 방지)
-  const sx = Math.round(col * fw);
-  const sy = Math.round(row * fh);
-  const sw = Math.round(fw);
-  const sh = Math.round(fh);
   const sc = targetH / fh;
-  const dw = sw * sc, dh = sh * sc;
+  // 실측 행 경계 적용 (없으면 명목 격자 사용)
+  const rowStarts = SPRITE_ROW_YS[key];
+  const sx = Math.round(col * fw);
+  const sy = rowStarts ? rowStarts[row] : Math.round(row * fh);
+  const sw = Math.round(fw);
+  const sh = rowStarts
+    ? (row + 1 < rowStarts.length ? rowStarts[row + 1] - sy : img.naturalHeight - sy)
+    : Math.round(fh);
+  const dw = Math.round(fw * sc), dh = Math.round(sh * sc);
   const actualFacingRight = frameFlip ? !facingRight : facingRight;
   ctx.save();
   ctx.globalAlpha = (alpha !== undefined) ? alpha : 1;
@@ -960,7 +999,7 @@ function hideHUD(){ document.getElementById('hud').classList.add('hid'); _showPa
 
 function showTitleRanking(){
   const tbody = document.getElementById('trk-body');
-  tbody.innerHTML = '<tr><td colspan="6" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
   document.getElementById('ts').classList.add('hid');
   document.getElementById('title-rank').classList.remove('hid');
   loadRankings().then(list => _buildRankRows(list, tbody, -1));
@@ -971,6 +1010,7 @@ function hideTitleRanking(){
 }
 function goToTitle(){
   try { BGM.title(); } catch(e){ console.warn('BGM.title failed:', e); }
+  applyMute();
   phase = 'title';
   gs = null;
   _titleEmbers = []; _titleEmberTimer = 0;
@@ -1049,6 +1089,14 @@ window.addEventListener('keyup', e=>{
 // ════════════════════════════════════════════════════════════════════
 // 오디오
 // ════════════════════════════════════════════════════════════════════
+let _muted = localStorage.getItem('hanyang-mute') === '1';
+function applyMute(){
+  BGM.setVol(_muted ? 0 : 0.52);
+  localStorage.setItem('hanyang-mute', _muted ? '1' : '0');
+  const btn = document.getElementById('btn-mute');
+  if(btn) btn.textContent = _muted ? '🔇' : '🔊';
+}
+
 let audioCtx = null;
 function _audio(){
   if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
@@ -1057,6 +1105,7 @@ function _audio(){
 }
 
 function sndHwando(crit){
+  if(_muted) return;
   const ac=_audio(), now=ac.currentTime, sr=ac.sampleRate;
 
   // ── Layer 1: 칼날 휘파람 whoosh (빠른 공기 가르기) ──
@@ -1135,6 +1184,7 @@ function sndHwando(crit){
 }
 
 function sndZombieHit(){
+  if(_muted) return;
   const ac=_audio(), now=ac.currentTime, sr=ac.sampleRate;
 
   // ── Layer 1: 살점 타격 (둔탁한 wet thwack) ──
@@ -1173,6 +1223,7 @@ function sndZombieHit(){
 }
 
 function sndZombieDie(){
+  if(_muted) return;
   const ac=_audio(), now=ac.currentTime, sr=ac.sampleRate;
 
   // ── Layer 1: 깊은 신음 (pitch 하강) ──
@@ -1212,6 +1263,7 @@ function sndZombieDie(){
 }
 
 function sndPlayerHit(){
+  if(_muted) return;
   const ac=_audio(), now=ac.currentTime, sr=ac.sampleRate;
 
   // ── Layer 1: 서브 펀치 (초저음 충격) ──
@@ -1248,6 +1300,7 @@ function sndPlayerHit(){
 }
 
 function sndExplosion(){
+  if(_muted) return;
   const ac=_audio(), now=ac.currentTime, sr=ac.sampleRate;
 
   // ── Layer 1: 서브 베이스 폭발 펀치 ──
@@ -1300,6 +1353,7 @@ function sndExplosion(){
 }
 
 function sndArrowShot(){
+  if(_muted) return;
   // 조총 발사음 — 화약 폭발 크랙 + 저음 붐 + 짧은 에코
   const ac=_audio(), now=ac.currentTime, sr=ac.sampleRate;
 
@@ -1349,6 +1403,7 @@ function sndArrowShot(){
 }
 
 function sndLevelup(){
+  if(_muted) return;
   const ac=_audio();
   [0,0.05,0.1].forEach((del,i)=>{
     setTimeout(()=>{
@@ -2146,6 +2201,7 @@ document.addEventListener('visibilitychange', async ()=>{
 function initGame(){
   _acquireWakeLock();
   try { BGM.stage(); } catch(e){ console.warn('BGM.stage failed:', e); }
+  applyMute();
   gameTime = 0;
   stage = 1;
   stageTimer = STAGE_DURATION;
@@ -2646,7 +2702,8 @@ function performSlash(p, angle){
 }
 
 // ── 궁수 시스템 ──────────────────────────────────────────────────────
-const ARROW_CONE = Math.PI / 12; // ±15° 탐지 원뿔
+const ARROW_CONE = Math.PI / 12;   // ±15° 탐지 원뿔 (탐지용, 발사각은 실제 목표 각도)
+const PLAYER_BODY_OFFSET = 52;     // 플레이어 스프라이트 발→몸통 중심 오프셋(px)
 
 function updateArcherCombat(dt){
   const p = gs.player;
@@ -2683,12 +2740,11 @@ function updateArcherCombat(dt){
     return;
   }
 
-  // 발사 방향 고정 (수평 순수 각도)
-  const baseAngle = fireDir;
+  // 발사 각도: 실제 목표 방향으로 조준 (좌우 기준 fireDir로 클램프)
+  const originY = p.y - PLAYER_BODY_OFFSET;
+  const aimAngle = Math.atan2((bestTarget.y - PLAYER_BODY_OFFSET) - originY, bestTarget.x - p.x);
+  const baseAngle = aimAngle;
   p.facingRight = (fireDir === 0);
-
-  // 화살 발사 — 몸 중심(발 기준 -52px)에서 출발
-  const originY = p.y - 52;
   const spread = p.arrowSpreadCount;
   // 산탄: 홀수 발 기준 ±14° 간격. 발 수가 짝수면 ±7° 부터 시작
   const spreadStep = Math.PI * 14 / 180;
@@ -2733,7 +2789,7 @@ function updateArrows(dt){
     // 좀비 충돌 검사
     for(const z of gs.zombies){
       if(z.dead) continue;
-      const dx = z.x - a.x, dy = z.y - a.y;
+      const dx = z.x - a.x, dy = (z.y - PLAYER_BODY_OFFSET) - a.y;
       if(Math.hypot(dx,dy) > z.radius + 8) continue;
       const isCrit = Math.random() < (0.06 + p.critChance);
       let dmg = a.dmg + (Math.random()*4-2);
@@ -3005,13 +3061,14 @@ function _loadLocal(){
 }
 
 // 점수 제출: 개별 파일로 저장 (race condition 없음)
-async function saveRanking(score, level, time, kills, stageNum){
+async function saveRanking(score, level, time, kills, stageNum, weapon){
   const mm=Math.floor(time/60), ss=Math.floor(time%60);
   _lastTs = Date.now();
   const entry = {
     name: _playerName(), score, level, kills,
     stage: stageNum||1,
     time: `${mm}:${ss<10?'0':''}${ss}`,
+    weapon: weapon||'pray',
     ts: _lastTs
   };
   _saveLocal(entry);
@@ -3077,10 +3134,11 @@ async function loadRankings(){
 }
 
 const RANK_MEDAL = ['🥇','🥈','🥉'];
+const WEAPON_LABEL = { slash: '검객', bow: '궁수', pray: '무당' };
 function _buildRankRows(list, tbody, myTs){
   tbody.innerHTML = '';
   if(list.length === 0){
-    tbody.innerHTML = '<tr><td colspan="6" style="color:#3a2010;padding:8px">아직 기록 없음</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#3a2010;padding:8px">아직 기록 없음</td></tr>';
     return;
   }
   list.forEach((r, i) => {
@@ -3092,14 +3150,15 @@ function _buildRankRows(list, tbody, myTs){
     else if(i===2) tr.className = 'rk3';
     const medal = RANK_MEDAL[i] || `${i+1}위`;
     const name = (r.name||'익명').slice(0,10);
-    tr.innerHTML = `<td>${medal}</td><td>${name}</td><td>${r.score.toLocaleString()}</td><td>S${r.stage||1}</td><td>Lv.${r.level}</td><td>${r.kills}처치</td>`;
+    const job = WEAPON_LABEL[r.weapon] || '-';
+    tr.innerHTML = `<td>${medal}</td><td>${name}</td><td>${job}</td><td>${r.score.toLocaleString()}</td><td>S${r.stage||1}</td><td>Lv.${r.level}</td><td>${r.kills}처치</td>`;
     tbody.appendChild(tr);
   });
 }
 
 function renderRankingTable(myRank){
   const tbody = document.getElementById('rktbody');
-  tbody.innerHTML = '<tr><td colspan="6" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
   loadRankings().then(list => {
     _buildRankRows(list, tbody, _lastTs);
     // 내 행이 보이도록 스크롤
@@ -3814,7 +3873,7 @@ function checkPlayerDeath(){
 async function _triggerGameOver(){
   try {
     BGM.fadeOut(1.0);
-    setTimeout(()=>{ try { BGM.ending(); } catch(e){ console.warn('BGM.ending failed:', e); } }, 1150);
+    setTimeout(()=>{ try { BGM.ending(); } catch(e){ console.warn('BGM.ending failed:', e); } applyMute(); }, 1150);
   } catch(e){ console.warn('BGM game over failed:', e); }
   phase = 'gameover';
   const mm=Math.floor(gameTime/60), ss=Math.floor(gameTime%60);
@@ -3824,7 +3883,7 @@ async function _triggerGameOver(){
   document.getElementById('gost').textContent =
     `STAGE ${stage}  ·  생존 ${mm}분 ${ss}초  ·  Lv.${gs.player.level}  ·  처치 ${gs.kills}  ·  최대콤보 ${gs.bestCombo}연`;
   showPanel('go');
-  const myRank = await saveRanking(finalScore, gs.player.level, gameTime, gs.kills, stage);
+  const myRank = await saveRanking(finalScore, gs.player.level, gameTime, gs.kills, stage, gs.player.weapon);
   document.getElementById('gorank').textContent =
     myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
   renderRankingTable(myRank);
@@ -3987,11 +4046,13 @@ _updateTitleNick();
 })();
 
 _bindBtn('btn-start', showCharacterSelect);
-_bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} showTitleRanking(); });
+_bindBtn('btn-rank',  ()=>{ try{BGM.title();}catch(e){} applyMute(); showTitleRanking(); });
+_bindBtn('btn-mute', ()=>{ _muted = !_muted; applyMute(); });
+applyMute(); // 저장된 음소거 상태로 버튼 아이콘 초기화
 _bindBtn('btn-rank-back', hideTitleRanking);
 _bindBtn('btn-go-home', goToTitle);
 _bindBtn('btn-next-stage', nextStage);
-_bindBtn('btn-cs-back', goToTitle);
+_bindBtn('btn-cs-back', ()=>{ _csStopLoop(); goToTitle(); });
 (function(){
   const btn = document.getElementById('pause-home-btn');
   if(!btn) return;
@@ -4001,45 +4062,304 @@ _bindBtn('btn-cs-back', goToTitle);
 })();
 
 
+// ══════════════════ 캐릭터 선택 미리보기 애니메이션 ══════════════════
+const _CS_RES = 2;           // canvas px per CSS px (retina)
+const CS_W = 206, CS_H = 216; // preview display size (CSS px)
+const CS_CX = CS_W / 2;      // character center x
+const CS_CY = CS_H - 16;     // character feet y
+const CS_CHAR_H = 128;       // target character height (CSS px)
+
+let _csAnimId = 0;
+let _csCvs = {};
+let _csState = {};
+let _csSelectedId = null;
+
+function _csDrawSprite(cctx, key, col, row){
+  const img = SPRITES[key];
+  if(!img || !img.naturalWidth) return;
+  const fw = img.naturalWidth / 4, fh = img.naturalHeight / 3;
+  const scale = CS_CHAR_H / fh;
+  const dw = fw * scale;
+  const rowStarts = SPRITE_ROW_YS[key];
+  const sy = rowStarts ? rowStarts[row] : row * fh;
+  const sh = rowStarts
+    ? (row + 1 < rowStarts.length ? rowStarts[row + 1] - sy : img.naturalHeight - sy)
+    : fh;
+  const dh = sh * scale;
+  cctx.drawImage(img, col*fw, sy, fw, sh, CS_CX - dw/2, CS_CY - dh, dw, dh);
+}
+
+function _csResetState(){
+  _csState = {
+    priest: {
+      t: 0, walkTimer: 0, atkTimer: 9,
+      orbs: [
+        {angle:0,   speed:2.0},
+        {angle:2.09,speed:2.0},
+        {angle:4.19,speed:2.0},
+      ],
+    },
+    swordsman: {
+      t: 0, walkTimer: 0, atkTimer: 9,
+    },
+    archer: {
+      t: 0, walkTimer: 0, atkTimer: 9,
+      arrows: [],
+    },
+  };
+}
+
+function _drawCSPriest(cctx, now){
+  const s = _csState.priest;
+  const dt = Math.min(now - s.t, 0.1); s.t = now;
+
+  s.walkTimer += dt;
+  s.atkTimer  += dt;
+  if(s.atkTimer > 3.0) s.atkTimer = 0;
+
+  const WALK = [[0,0],[1,0],[2,0],[1,0]];
+  const wf = Math.floor(s.walkTimer / 0.20) % WALK.length;
+  const inAtk = s.atkTimer < 0.45;
+  let col, row;
+  if(inAtk){
+    [col,row] = s.atkTimer < 0.22 ? [2,0] : [3,0];
+  } else {
+    [col,row] = WALK[wf];
+  }
+
+  // ground glow
+  const gg = cctx.createRadialGradient(CS_CX, CS_CY, 0, CS_CX, CS_CY, 62);
+  gg.addColorStop(0,'rgba(140,60,220,0.18)'); gg.addColorStop(1,'rgba(0,0,0,0)');
+  cctx.fillStyle = gg;
+  cctx.beginPath(); cctx.ellipse(CS_CX, CS_CY, 62, 12, 0, 0, Math.PI*2); cctx.fill();
+
+  // orbiting talisman orbs
+  const orbY = CS_CY - 55;
+  for(const orb of s.orbs){
+    orb.angle += orb.speed * dt;
+    const ox = CS_CX + Math.cos(orb.angle) * 48;
+    const oy = orbY  + Math.sin(orb.angle) * 13;
+    const og = cctx.createRadialGradient(ox, oy, 0, ox, oy, 12);
+    const bright = inAtk ? 1.0 : 0.85;
+    og.addColorStop(0,`rgba(210,130,255,${bright})`);
+    og.addColorStop(0.5,`rgba(160,60,230,${bright*0.55})`);
+    og.addColorStop(1,'rgba(90,20,180,0)');
+    cctx.fillStyle = og;
+    cctx.beginPath(); cctx.arc(ox, oy, 12, 0, Math.PI*2); cctx.fill();
+    // inner square
+    cctx.save(); cctx.translate(ox, oy); cctx.rotate(orb.angle * 2.5);
+    cctx.fillStyle = 'rgba(245,195,255,0.95)';
+    cctx.fillRect(-4, -4, 8, 8); cctx.restore();
+  }
+
+  // attack flash
+  if(inAtk && s.atkTimer < 0.18){
+    const a = (1 - s.atkTimer/0.18) * 0.40;
+    cctx.save(); cctx.globalAlpha = a;
+    const fg = cctx.createRadialGradient(CS_CX, orbY, 0, CS_CX, orbY, 60);
+    fg.addColorStop(0,'#dd99ff'); fg.addColorStop(1,'rgba(130,40,220,0)');
+    cctx.fillStyle = fg; cctx.beginPath(); cctx.arc(CS_CX, orbY, 60, 0, Math.PI*2); cctx.fill();
+    cctx.restore();
+  }
+
+  _csDrawSprite(cctx, 'player', col, row);
+}
+
+function _drawCSSwordsman(cctx, now){
+  const s = _csState.swordsman;
+  const dt = Math.min(now - s.t, 0.1); s.t = now;
+
+  s.walkTimer += dt;
+  s.atkTimer  += dt;
+  if(s.atkTimer > 2.4) s.atkTimer = 0;
+
+  const WALK = [[0,0],[1,0],[2,0],[1,0]];
+  const wf = Math.floor(s.walkTimer / 0.18) % WALK.length;
+  const inAtk = s.atkTimer < 0.55;
+  let col, row;
+  if(inAtk){
+    [col,row] = s.atkTimer < 0.27 ? [3,0] : [0,1];
+  } else {
+    [col,row] = WALK[wf];
+  }
+
+  // ground glow
+  const gg = cctx.createRadialGradient(CS_CX, CS_CY, 0, CS_CX, CS_CY, 62);
+  gg.addColorStop(0,'rgba(200,140,20,0.15)'); gg.addColorStop(1,'rgba(0,0,0,0)');
+  cctx.fillStyle = gg;
+  cctx.beginPath(); cctx.ellipse(CS_CX, CS_CY, 62, 12, 0, 0, Math.PI*2); cctx.fill();
+
+  // slash arc VFX
+  if(inAtk){
+    const prog = s.atkTimer / 0.55;
+    const startA = -Math.PI * 0.85;
+    const endA = startA + Math.PI * 1.55 * Math.min(prog * 1.8, 1);
+    const fadeA = prog < 0.55 ? prog * 1.8 : (1 - prog) * 2.5;
+    const alpha = Math.max(0, Math.min(1, fadeA)) * 0.80;
+    const arcX = CS_CX + 18, arcY = CS_CY - 62;
+    cctx.save(); cctx.globalAlpha = alpha;
+    cctx.beginPath();
+    cctx.arc(arcX, arcY, 62, startA, endA);
+    cctx.arc(arcX, arcY, 32, endA, startA, true);
+    cctx.closePath();
+    const sg = cctx.createLinearGradient(arcX-65, arcY-30, arcX+65, arcY+30);
+    sg.addColorStop(0,'rgba(255,255,180,0)');
+    sg.addColorStop(0.35,'rgba(255,230,100,0.95)');
+    sg.addColorStop(1,'rgba(255,160,30,0)');
+    cctx.fillStyle = sg; cctx.fill();
+    // bright edge line
+    cctx.beginPath();
+    cctx.arc(arcX, arcY, 64, startA, endA);
+    cctx.strokeStyle = 'rgba(255,245,200,0.70)'; cctx.lineWidth = 2; cctx.stroke();
+    cctx.restore();
+  }
+
+  _csDrawSprite(cctx, 'player_sword', col, row);
+}
+
+function _drawCSArcher(cctx, now){
+  const s = _csState.archer;
+  const dt = Math.min(now - s.t, 0.1); s.t = now;
+
+  s.walkTimer += dt;
+  s.atkTimer  += dt;
+  if(s.atkTimer > 1.9) s.atkTimer = 0;
+
+  const WALK = [[0,0],[1,0],[2,0],[1,0]];
+  const wf = Math.floor(s.walkTimer / 0.20) % WALK.length;
+  const inAtk = s.atkTimer < 0.44;
+  let col, row;
+  if(inAtk){
+    [col,row] = s.atkTimer < 0.22 ? [3,0] : [3,1];
+  } else {
+    [col,row] = WALK[wf];
+  }
+
+  // spawn arrow at start of attack
+  if(inAtk && s.atkTimer < dt + 0.02 && (s.arrows.length === 0 || s.arrows[s.arrows.length-1].ax > 60)){
+    s.arrows.push({ ax: CS_CX + 16, ay: CS_CY - 60, vx: 210, life: 1.1, trail: [] });
+  }
+
+  // ground glow
+  const gg = cctx.createRadialGradient(CS_CX, CS_CY, 0, CS_CX, CS_CY, 58);
+  gg.addColorStop(0,'rgba(40,140,220,0.13)'); gg.addColorStop(1,'rgba(0,0,0,0)');
+  cctx.fillStyle = gg;
+  cctx.beginPath(); cctx.ellipse(CS_CX, CS_CY, 58, 11, 0, 0, Math.PI*2); cctx.fill();
+
+  // arrows
+  for(let i = s.arrows.length - 1; i >= 0; i--){
+    const a = s.arrows[i];
+    a.life -= dt;
+    if(a.life <= 0){ s.arrows.splice(i,1); continue; }
+    a.trail.unshift({x: a.ax, y: a.ay});
+    if(a.trail.length > 7) a.trail.pop();
+    a.ax += a.vx * dt;
+    if(a.ax > CS_W + 40){ s.arrows.splice(i,1); continue; }
+
+    // trail
+    for(let t = 0; t < a.trail.length - 1; t++){
+      const al = (1 - t / a.trail.length) * 0.48;
+      const lw = (1 - t / a.trail.length) * 3.2;
+      cctx.beginPath(); cctx.moveTo(a.trail[t].x, a.trail[t].y);
+      cctx.lineTo(a.trail[t+1].x, a.trail[t+1].y);
+      cctx.strokeStyle = `rgba(120,210,255,${al})`; cctx.lineWidth = lw;
+      cctx.lineCap = 'round'; cctx.stroke();
+    }
+    // shaft
+    const shaftLen = 22;
+    cctx.beginPath(); cctx.moveTo(a.ax - shaftLen, a.ay); cctx.lineTo(a.ax, a.ay);
+    const shg = cctx.createLinearGradient(a.ax - shaftLen, 0, a.ax, 0);
+    shg.addColorStop(0,'#7a5120'); shg.addColorStop(1,'#d4a84b');
+    cctx.strokeStyle = shg; cctx.lineWidth = 2.2; cctx.stroke();
+    // arrowhead
+    const tipX = a.ax + 8;
+    cctx.beginPath(); cctx.moveTo(tipX, a.ay);
+    cctx.lineTo(tipX-9, a.ay-4); cctx.lineTo(tipX-9, a.ay+4);
+    cctx.closePath(); cctx.fillStyle = '#d8f4ff'; cctx.fill();
+    // tip glow
+    const tg = cctx.createRadialGradient(tipX, a.ay, 0, tipX, a.ay, 9);
+    tg.addColorStop(0,'rgba(185,240,255,0.85)'); tg.addColorStop(1,'rgba(60,165,255,0)');
+    cctx.fillStyle = tg;
+    cctx.beginPath(); cctx.arc(tipX, a.ay, 9, 0, Math.PI*2); cctx.fill();
+  }
+
+  _csDrawSprite(cctx, 'player_archer', col, row);
+}
+
+const _csDrawers = { priest: _drawCSPriest, swordsman: _drawCSSwordsman, archer: _drawCSArcher };
+const _csKeyMap   = { priest: 'player', swordsman: 'player_sword', archer: 'player_archer' };
+const _csIdleFrame= { priest: [3,0], swordsman: [0,0], archer: [0,0] };
+
+function _csDrawStatic(id){
+  const cv = _csCvs[id]; if(!cv) return;
+  const cctx = cv.getContext('2d');
+  cctx.setTransform(_CS_RES, 0, 0, _CS_RES, 0, 0);
+  cctx.clearRect(0, 0, CS_W, CS_H);
+  // subtle ground glow
+  const gg = cctx.createRadialGradient(CS_CX, CS_CY, 0, CS_CX, CS_CY, 60);
+  gg.addColorStop(0,'rgba(80,40,8,0.14)'); gg.addColorStop(1,'rgba(0,0,0,0)');
+  cctx.fillStyle = gg;
+  cctx.beginPath(); cctx.ellipse(CS_CX, CS_CY, 60, 11, 0, 0, Math.PI*2); cctx.fill();
+  const [col, row] = _csIdleFrame[id];
+  _csDrawSprite(cctx, _csKeyMap[id], col, row);
+}
+
+function _csLoop(ts){
+  const id = _csSelectedId;
+  if(!id || !_csCvs[id]){ _csAnimId = 0; return; }
+  const now = ts / 1000;
+  const cv = _csCvs[id];
+  const cctx = cv.getContext('2d');
+  cctx.setTransform(_CS_RES, 0, 0, _CS_RES, 0, 0);
+  cctx.clearRect(0, 0, CS_W, CS_H);
+  _csDrawers[id](cctx, now);
+  _csAnimId = requestAnimationFrame(_csLoop);
+}
+
+function _csStopLoop(){
+  if(_csAnimId){ cancelAnimationFrame(_csAnimId); _csAnimId = 0; }
+}
+
 // 캐릭터 선택 화면
 function showCharacterSelect(){
   phase = 'charselect';
   hideAllPanels();
   document.getElementById('cs').classList.remove('hid');
-  // 초상화 렌더 — DPR 확대 + 고품질 스무딩으로 뿌옇게 보이는 문제 해결
-  const RES_MULT = 3; // 백업 저장소를 3배 해상도로 (CSS transform 2~3x 확대 대응)
-  document.querySelectorAll('.cs-portrait-cv').forEach(cv => {
-    const key = cv.getAttribute('data-src');
-    const img = SPRITES[key];
-    if(!img || !img.naturalWidth) return;
-    const displayW = 88, displayH = 88;
-    // 백업 저장소를 3배 해상도로 세팅 (CSS 표시 크기는 88×88 유지)
-    cv.width  = displayW * RES_MULT;
-    cv.height = displayH * RES_MULT;
-    cv.style.width  = displayW + 'px';
-    cv.style.height = displayH + 'px';
-    const cctx = cv.getContext('2d');
-    cctx.imageSmoothingEnabled = true;
-    cctx.imageSmoothingQuality = 'high';
-    cctx.setTransform(RES_MULT, 0, 0, RES_MULT, 0, 0); // CSS px 좌표계로 draw
-    cctx.clearRect(0, 0, displayW, displayH);
-    // 첫 프레임(idle) 발췌: 여도사 [3,0], 검객 [0,0]
-    const col = key==='player' ? 3 : 0;
-    const fw = img.naturalWidth/4, fh = img.naturalHeight/3;
-    const sx = col*fw, sy = 0;
-    const cropH = fh*0.9;
-    const scale = displayH / cropH;
-    const dw = fw * scale, dh = cropH * scale;
-    cctx.drawImage(img, sx, sy, fw, cropH, (displayW-dw)/2, 0, dw, dh);
+  _csSelectedId = null;
+  _csCvs = {};
+  document.querySelectorAll('.cs-cv').forEach(cv => {
+    _csCvs[cv.getAttribute('data-char')] = cv;
   });
+  _csStopLoop();
+  // 모든 카드 선택 해제 + 정적 이미지로 초기화
+  document.querySelectorAll('#cs .cs-card').forEach(c => c.classList.remove('cs-selected'));
+  for(const id of Object.keys(_csKeyMap)) _csDrawStatic(id);
 }
+
 function selectCharacter(id){
+  _csStopLoop();
   selectedCharacter = CHARACTERS[id] ? id : 'priest';
   initGame();
 }
 document.querySelectorAll('#cs .cs-card').forEach(card => {
   const id = card.getAttribute('data-char');
-  const handler = (e)=>{ e.preventDefault(); e.stopPropagation(); selectCharacter(id); };
+  const handler = (e)=>{
+    e.preventDefault(); e.stopPropagation();
+    if(_csSelectedId === id){
+      // 이미 선택된 카드 재탭 → 게임 시작
+      selectCharacter(id);
+    } else {
+      // 첫 선택 → 애니메이션 시작
+      _csStopLoop();
+      // 이전 선택 카드 정적으로 복원
+      if(_csSelectedId) _csDrawStatic(_csSelectedId);
+      document.querySelectorAll('#cs .cs-card').forEach(c => c.classList.remove('cs-selected'));
+      card.classList.add('cs-selected');
+      _csSelectedId = id;
+      _csResetState();
+      _csAnimId = requestAnimationFrame(_csLoop);
+    }
+  };
   card.addEventListener('click', handler);
   card.addEventListener('touchend', handler);
 });
@@ -5124,21 +5444,21 @@ function drawZombieSprite(z, flash){
       walk:   [[3,0],[3,1]],   // 돌진 달리기 프레임
       attack: [[2,0]],         // 칼 슬래시+붉은 궤적
       hit:    [[1,2]],         // 머리 젖혀짐+혈흔
-      death:  [[3,2]],         // 쓰러짐
+      death:  [[3,2,'flip']],  // 쓰러짐 (시트 기본이 왼쪽이라 flip 보정)
     },
     z_archer: {
       idle:   [[0,0]],
       walk:   [[1,0],[0,1]],   // 소총 들고 걷기 두 프레임
       attack: [[2,0]],         // 조준/사격 자세
       hit:    [[1,2]],         // 피격+혈흔 비명
-      death:  [[3,2]],         // 기어가며 사망
+      death:  [[3,2,'flip']],  // 기어가며 사망 (시트 기본이 왼쪽이라 flip 보정)
     },
     z_tanker: {
       idle:   [[0,0]],
       walk:   [[3,0],[3,1]],   // 걷기 2프레임
       attack: [[2,0],[3,0]],   // 칼 슬래시→포효+팔 뻗기
       hit:    [[1,2]],         // 피격+혈흔 비명
-      death:  [[3,2]],         // 쓰러짐+혈흔
+      death:  [[3,2,'flip']],  // 쓰러짐+혈흔 (시트 기본이 왼쪽이라 flip 보정)
     },
   };
   const Z_FRAMES = FRAMES_BY_SPRITE[spriteKey] || FRAMES_BY_SPRITE.z_normal;
@@ -5447,12 +5767,12 @@ function drawPlayer_(){
     hit:    [[0,2]],
     death:  [[0,2],[3,2]],
   };
-  // 궁수 프레임 테이블 — PC_궁수 4×3 시트
+  // 궁수 프레임 테이블 — PC_여궁수_2 4×3 시트
   const P_FRAMES_ARCHER = {
     idle:   [[0,0]],
-    walk:   [[0,0],[1,0]],
-    attack: [[2,0],[0,1]],
-    hit:    [[1,2]],
+    walk:   [[1,0],[2,0]],
+    attack: [[3,0],[3,1]],   // 시위당김 → 파란 글로우 발사
+    hit:    [[0,2]],
     death:  [[2,2],[3,2]],
   };
   const P_FRAMES = (p.weapon === 'slash') ? P_FRAMES_SWORD
@@ -6329,6 +6649,7 @@ requestAnimationFrame(tick);
     dismissed = true;
     if(e){ try{ e.preventDefault(); }catch(_){} }
     try { BGM.title(); } catch(err){ console.warn('BGM.title on splash failed:', err); }
+    applyMute();
     sp.classList.add('fadeout');
     setTimeout(()=>{ sp.parentNode && sp.parentNode.removeChild(sp); }, 620);
   };
