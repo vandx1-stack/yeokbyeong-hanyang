@@ -1019,7 +1019,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -2901,9 +2901,7 @@ function performSlash(p, angle){
       if(p.fireDmg > 0) z.fireTimer = Math.max(z.fireTimer, 3.0);
 
       const nb = 140 * p.knockbackMult * (1 - z.def.knockbackRes) / hits;
-      const nd2 = Math.max(0.01, dist);
-      z.knockVx += (dxx/nd2) * nb;
-      z.knockVy += (dyy/nd2) * nb;
+      applyKnockback(z, dxx, dyy, nb);
 
       z.hitFlash = 1;
       const ox = (Math.random()-0.5)*12, oy = (Math.random()-0.5)*8;
@@ -3021,7 +3019,7 @@ function updateArrows(dt){
       if(p.fireDmg > 0) z.fireTimer = Math.max(z.fireTimer, 3.0);
       z.hitFlash = 1;
       const nb = 90 * p.knockbackMult * (1 - z.def.knockbackRes);
-      z.knockVx += Math.cos(a.angle) * nb; z.knockVy += Math.sin(a.angle) * nb;
+      applyKnockback(z, Math.cos(a.angle), Math.sin(a.angle), nb);
       spawnHitImpact(a.x, a.y, a.angle, isCrit);
       spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit);
       gs.screen.shakeX = isCrit ? 4 : 1.5;
@@ -3157,9 +3155,7 @@ function updateSwordHits(){
 
       // 넉백: 부적 → 좀비 방향
       const nb = wDef.knockback * p.knockbackMult * (1 - z.def.knockbackRes);
-      const nd = Math.max(0.01, dist);
-      z.knockVx += (dx/nd) * nb;
-      z.knockVy += (dy/nd) * nb;
+      applyKnockback(z, dx, dy, nb);
 
       z.hitFlash = 1;
       spawnHitImpact(tx, ty, angle, isCrit);
@@ -3424,7 +3420,8 @@ function doExplosion(ex, ey, radius, dmg){
   spawnExplosionParticles(ex, ey, radius);
   gs.screen.shakeX = Math.min(5 + radius * 0.10, 20);
   gs.screen.shakeY = Math.min(4 + radius * 0.08, 15);
-  gs.flashTimer = 0.14;
+  gs.flashTimer = 0.075;
+  gs.flashX = ex; gs.flashY = ey;   // 화면 중앙이 아니라 폭발 지점에서 번지도록
   for(const z of gs.zombies){
     if(z.dead) continue;
     const dx = z.x-ex, dy = z.y-ey;
@@ -3432,7 +3429,7 @@ function doExplosion(ex, ey, radius, dmg){
     if(d < radius+z.radius){
       z.hp -= dmg * (1 - d/(radius+z.radius));
       const nb = 220*(1-d/(radius+z.radius));
-      if(d>0){ z.knockVx += (dx/d)*nb; z.knockVy += (dy/d)*nb; }
+      if(d>0) applyKnockback(z, dx, dy, nb);
       if(z.hp <= 0) killZombie(z);
     }
   }
@@ -3470,7 +3467,22 @@ function updateZombies(dt){
       if(z.hp <= 0){ killZombie(z); continue; }
     }
 
-    // 넉백 감쇄
+    // 넉백 감쇄 + 밀려나는 동안 속도선
+    const kbSpd = Math.hypot(z.knockVx, z.knockVy);
+    if(kbSpd > 90){
+      z._kbTrail = (z._kbTrail || 0) - dt;
+      if(z._kbTrail <= 0){
+        z._kbTrail = 0.028;
+        const ka = Math.atan2(z.knockVy, z.knockVx);
+        gs.particles.push({
+          type:'kbstreak',
+          x: z.x - Math.cos(ka)*z.radius*0.3,
+          y: z.y - z.radius*0.5 - Math.sin(ka)*z.radius*0.3,
+          vx:0, vy:0, life:0.16, maxLife:0.16,
+          size: Math.min(34, kbSpd*0.075), angle: ka,
+        });
+      }
+    }
     z.knockVx *= Math.pow(0.04, dt);
     z.knockVy *= Math.pow(0.04, dt);
 
@@ -3632,8 +3644,18 @@ function spawnHitImpact(x, y, hitAngle, isCrit){
     size: isCrit ? 26 : 16,
   });
 
+  // ── 피격 방향 쐐기 ──
+  // 혈흔이 사방으로 퍼지기만 하면 어느 방향에서 맞았는지 읽히지 않는다.
+  // 타격 방향으로 열린 짧은 호를 얹어 충격의 방향을 명확히 한다.
+  gs.particles.push({
+    type:'hitwedge',
+    x: x - Math.cos(hitAngle)*6, y: y - Math.sin(hitAngle)*6,
+    vx:0, vy:0, life: isCrit ? 0.17 : 0.13, maxLife: isCrit ? 0.17 : 0.13,
+    size: isCrit ? 26 : 15, angle: hitAngle, crit: isCrit,
+  });
+
   // ── 혈액 미스트 (안개처럼 퍼지는 미세 혈분) ──
-  const mistCount = isCrit ? 45 : 25;
+  const mistCount = isCrit ? 22 : 12;
   for(let i=0;i<mistCount;i++){
     const a = hitAngle + (Math.random()-0.5)*Math.PI*(isCrit?1.6:1.1);
     const spd = 25+Math.random()*110;
@@ -3648,7 +3670,7 @@ function spawnHitImpact(x, y, hitAngle, isCrit){
   }
 
   // ── 혈액 분사 (메인 스프레이) ──
-  const bloodMain = isCrit ? 52 : 30;
+  const bloodMain = isCrit ? 32 : 18;
   for(let i=0;i<bloodMain;i++){
     const concentrated = Math.random() < 0.68;
     const a = concentrated
@@ -3669,7 +3691,7 @@ function spawnHitImpact(x, y, hitAngle, isCrit){
   }
 
   // ── 혈액 제트 (고속 분사줄기) ──
-  const jetCount = isCrit ? 5 : 2;
+  const jetCount = isCrit ? 4 : 2;
   for(let i=0;i<jetCount;i++){
     const a = hitAngle + (Math.random()-0.5)*Math.PI*0.38;
     const baseSpd = 380+Math.random()*220;
@@ -3688,7 +3710,7 @@ function spawnHitImpact(x, y, hitAngle, isCrit){
   }
 
   // ── 큰 핏방울 (중력 낙하, 착지 시 추가 혈흔) ──
-  const dropCount = isCrit ? 18 : 9;
+  const dropCount = isCrit ? 12 : 6;
   for(let i=0;i<dropCount;i++){
     const a = hitAngle + (Math.random()-0.5)*Math.PI*0.85;
     const spd = 65+Math.random()*170;
@@ -3725,8 +3747,11 @@ function spawnExplosionParticles(x, y, radius){
   const sc = Math.max(0.7, radius / 80);
 
   // ── 순간 섬광 ───────────────────────────────────────────────
+  // 예전에는 size가 radius*2.4(최대 336px)라 'lighter' 합성과 겹쳐
+  // 화면 전체가 하얗게 날아가면서 적 위치가 안 보였다. 코어를 좁게 잡고
+  // 감쇠를 빠르게 해, 번쩍임은 남기되 시야는 유지한다.
   gs.particles.push({ type:'flash', x, y, vx:0, vy:0,
-    life:0.10, maxLife:0.10, size:radius*2.4 });
+    life:0.09, maxLife:0.09, size:radius*1.15 });
 
   // ── 중앙 화구 (3겹 방사형) ──────────────────────────────────
   [
@@ -3748,8 +3773,17 @@ function spawnExplosionParticles(x, y, radius){
     color:rd.col, lineW:rd.lw, spikes:0,
   }));
 
+  // ── 지면 충격파 (바닥을 훑는 납작한 링) ────────────────────
+  // 정원(正圓) 링만으로는 위에서 내려다보는 시점에서 폭발이 공중에 뜬 것처럼
+  // 읽힌다. 지면을 훑는 타원을 하나 더 깔아 폭발이 바닥에서 일어난 느낌을 준다.
+  gs.particles.push({
+    type:'shockring', x, y:y+radius*0.16, vx:0, vy:0,
+    maxRadius: radius*2.2, life:0.40, maxLife:0.40,
+    color:'rgba(226,190,132,0.8)', lineW:3.2*sc,
+  });
+
   // ── 화염 방출 ────────────────────────────────────────────────
-  const fireCnt = Math.round(75 * sc);
+  const fireCnt = Math.round(42 * sc);
   for(let i=0;i<fireCnt;i++){
     const a=Math.random()*Math.PI*2;
     const spd=(70+Math.random()*280)*sc;
@@ -3765,7 +3799,7 @@ function spawnExplosionParticles(x, y, radius){
   }
 
   // ── 연기 (회색/갈색, 위로 상승) ─────────────────────────────
-  const smokeCnt = Math.round(38 * sc);
+  const smokeCnt = Math.round(22 * sc);
   for(let i=0;i<smokeCnt;i++){
     const a=Math.random()*Math.PI*2, spd=(10+Math.random()*45)*sc;
     const g = 28 + Math.random()*38|0;
@@ -3780,7 +3814,7 @@ function spawnExplosionParticles(x, y, radius){
   }
 
   // ── 스파크 ──────────────────────────────────────────────────
-  for(let i=0;i<65;i++){
+  for(let i=0;i<34;i++){
     const a=Math.random()*Math.PI*2, spd=(200+Math.random()*400)*sc;
     gs.particles.push({
       type:'spark', x, y,
@@ -3792,7 +3826,7 @@ function spawnExplosionParticles(x, y, radius){
   }
 
   // ── 파편 (흙/돌, 갈색) ──────────────────────────────────────
-  for(let i=0;i<22;i++){
+  for(let i=0;i<16;i++){
     const a=Math.random()*Math.PI*2, spd=(70+Math.random()*190)*sc;
     const br=38+Math.random()*28|0;
     gs.particles.push({
@@ -3807,7 +3841,7 @@ function spawnExplosionParticles(x, y, radius){
   }
 
   // ── 불씨 (ember) ─────────────────────────────────────────────
-  for(let i=0;i<22;i++){
+  for(let i=0;i<14;i++){
     const a=Math.random()*Math.PI*2, spd=(75+Math.random()*145)*sc;
     gs.particles.push({
       type:'ember', x, y,
@@ -3930,6 +3964,78 @@ function spawnDmgNum(x, y, dmg, crit){
   });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// 파티클 예산
+// ════════════════════════════════════════════════════════════════════
+// 상한이 없으면 후반 스테이지(좀비 20+ · 폭발 4스택)에서 파티클이 폭증해
+// 모바일에서 프레임이 무너진다. 측정값: 좀비 4마리 전투에서도 최대 520개,
+// 폭발 1회 314개 · 크리티컬 피격 1회 152개가 한 번에 생성된다.
+// 예산을 넘으면 '장식적인' 파티클부터, 남은 수명이 짧은 것부터 버린다.
+const PARTICLE_BUDGET = 420;
+const PARTICLE_PRIO = {
+  // 0 = 반드시 보여야 하는 것(타격·폭발의 핵심 실루엣)
+  flash:0, fireball:0, ring:0, shockring:0, scorch:0,
+  bloodpool:0, bloodflash:0, hitwedge:0, kbwedge:0,
+  // 1 = 주요 표현
+  blood:1, blooddrop:1, fire:1, spark:1, debris:1, kbdust:1, kbstreak:1,
+  // 2 = 장식 (가장 먼저 정리)
+  bloodmist:2, smoke:2, ember:2, orbtrail:2, shatter:2,
+};
+function _trimParticles(){
+  const list = gs.particles;
+  const over = list.length - PARTICLE_BUDGET;
+  if(over <= 0) return;
+  const cand = [];
+  for(let i=0;i<list.length;i++){
+    const prio = PARTICLE_PRIO[list[i].type] ?? 1;
+    if(prio > 0) cand.push(i);
+  }
+  // 장식(prio 큰 순) → 같은 등급이면 곧 사라질 것(life 짧은 순)부터
+  cand.sort((a,b) => ((PARTICLE_PRIO[list[b].type] ?? 1) - (PARTICLE_PRIO[list[a].type] ?? 1))
+                  || (list[a].life - list[b].life));
+  const drop = new Set(cand.slice(0, over));
+  if(drop.size) gs.particles = list.filter((_, i) => !drop.has(i));
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 넉백
+// ════════════════════════════════════════════════════════════════════
+// 넉백은 그동안 좌표만 밀 뿐 아무 연출이 없어서, '격파술'을 찍어도
+// 강해진 것이 눈에 보이지 않았다. 물리 적용과 연출을 한 곳에 모아
+// 세기(power)에 비례한 피드백을 준다.
+const KB_FX_MIN = 55;   // 이 미만의 약한 넉백은 연출 생략
+function applyKnockback(z, dirX, dirY, power){
+  const d = Math.hypot(dirX, dirY) || 1;
+  const nx = dirX / d, ny = dirY / d;
+  z.knockVx += nx * power;
+  z.knockVy += ny * power;
+  if(power < KB_FX_MIN) return;
+
+  const s = Math.min(1, power / 260);          // 연출 세기 0~1
+  // 발밑 흙먼지 — 밀려나는 반대쪽으로 퍼진다
+  const n = 4 + Math.round(s * 7);
+  for(let i=0;i<n;i++){
+    const a  = Math.atan2(-ny, -nx) + (Math.random()-0.5) * Math.PI * 0.9;
+    const sp = (30 + Math.random()*90) * (0.5 + s);
+    gs.particles.push({
+      type:'kbdust',
+      x: z.x + (Math.random()-0.5)*10,
+      y: z.y + z.radius*0.34 + (Math.random()-0.5)*4,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp*0.35 - 8,
+      life: 0.26+Math.random()*0.30, maxLife: 0.56,
+      size: (4+Math.random()*7) * (0.6 + s*0.7),
+    });
+  }
+  // 밀리는 방향을 가리키는 충격 쐐기
+  gs.particles.push({
+    type:'kbwedge',
+    x: z.x - nx*z.radius*0.5, y: z.y - z.radius*0.45,
+    vx:0, vy:0, life:0.16, maxLife:0.16,
+    size: 16 + s*26, angle: Math.atan2(ny, nx), power: s,
+  });
+  z._kbTrail = 0;   // 다음 프레임부터 속도선 발생
+}
+
 function updateParticles(dt){
   const now = performance.now()*0.001;
   for(let i=gs.particles.length-1;i>=0;i--){
@@ -3971,6 +4077,7 @@ function updateParticles(dt){
       p.vy+=170*dt; p.vx*=Math.pow(0.68,dt);
     }
   }
+  _trimParticles();
 }
 
 function updateXpOrbs(dt){
@@ -4725,12 +4832,16 @@ function draw(){
     drawJoystick();
     // 폭발 섬광 오버레이
     if(gs.flashTimer > 0){
-      const fa = Math.pow(gs.flashTimer / 0.14, 1.8) * 0.82;
+      // 화면 전체를 태우던 섬광(최대 알파 0.82)을 0.3까지 낮추고, 폭발 지점을
+      // 중심으로 좁게 번지도록 바꿨다. 타격감은 화면 흔들림·충격파가 담당하고
+      // 섬광은 거들기만 한다 — 폭발 중에도 적 위치가 보여야 하기 때문.
+      const fa = Math.pow(gs.flashTimer / 0.075, 1.8) * 0.30;
+      const fx = gs.flashX ?? MAP_W/2, fy = gs.flashY ?? PLAY_H/2;
       ctx.save();
       ctx.globalAlpha = fa;
-      const fg = ctx.createRadialGradient(MAP_W/2,PLAY_H/2,0,MAP_W/2,PLAY_H/2,Math.max(MAP_W,PLAY_H)*0.75);
-      fg.addColorStop(0,'rgba(255,240,180,1)');
-      fg.addColorStop(0.4,'rgba(255,160,40,0.6)');
+      const fg = ctx.createRadialGradient(fx,fy,0,fx,fy,Math.max(MAP_W,PLAY_H)*0.42);
+      fg.addColorStop(0,'rgba(255,238,186,1)');
+      fg.addColorStop(0.35,'rgba(255,150,40,0.45)');
       fg.addColorStop(1,'rgba(0,0,0,0)');
       ctx.fillStyle=fg; ctx.fillRect(0,0,MAP_W,PLAY_H);
       ctx.restore();
@@ -5663,8 +5774,41 @@ function drawZombies(){
       ctx.globalAlpha = z.deathTimer / 0.6;
     }
 
+    // 연소 중 열 발광 — 불 파티클만으로는 '이 적이 타고 있다'가 잘 읽히지 않아,
+    // 발밑 광원과 실루엣 가장자리의 따뜻한 빛을 더한다.
+    if(z.fireTimer > 0 && !z.dead){
+      const fi = Math.min(1, z.fireTimer / 1.2);          // 꺼질 때 서서히 감쇠
+      const fl = 0.55 + Math.sin(performance.now()*0.012 + z.x*0.1) * 0.18;  // 일렁임
+      const r  = z.def.radius;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = fi * fl * 0.5;
+      const gg = ctx.createRadialGradient(0, r*0.35, 0, 0, r*0.35, r*2.4);
+      gg.addColorStop(0,   'rgba(255,150,40,0.85)');
+      gg.addColorStop(0.45,'rgba(220,70,0,0.35)');
+      gg.addColorStop(1,   'rgba(120,20,0,0)');
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.ellipse(0, r*0.35, r*2.4, r*1.15, 0, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+
     const flash = z.hitFlash > 0;
     drawZombieSprite(z, flash);
+
+    // 연소 중 실루엣 상단 잔열 — 스프라이트 위에 얹어 '달아오른' 느낌
+    if(z.fireTimer > 0 && !z.dead){
+      const fi = Math.min(1, z.fireTimer / 1.2);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = fi * 0.18;
+      const r = z.def.radius;
+      const hg = ctx.createLinearGradient(0, -r*1.9, 0, r*0.6);
+      hg.addColorStop(0, 'rgba(255,120,20,0.55)');
+      hg.addColorStop(1, 'rgba(255,60,0,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.ellipse(0, -r*0.6, r*1.05, r*1.5, 0, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
     ctx.restore();
 
   }
@@ -6257,6 +6401,87 @@ function drawParticles(){
       }
       ctx.closePath();
       ctx.fill();
+      ctx.restore(); continue;
+    }
+
+    if(p.type === 'kbdust'){
+      // 넉백 흙먼지 — 지면에 깔리도록 납작한 타원
+      const sz = p.size * (0.7 + (1-a) * 1.5);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.globalAlpha = a * a * 0.62;
+      const dg = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(0.1, sz));
+      dg.addColorStop(0,   'rgba(196,168,128,0.85)');
+      dg.addColorStop(0.55,'rgba(128,104,76,0.48)');
+      dg.addColorStop(1,   'rgba(70,56,40,0)');
+      ctx.fillStyle = dg;
+      ctx.beginPath(); ctx.ellipse(0, 0, sz, sz*0.45, 0, 0, Math.PI*2); ctx.fill();
+      ctx.restore(); continue;
+    }
+
+    if(p.type === 'kbwedge'){
+      // 넉백 충격 쐐기 — 밀려나는 방향을 가리키는 호
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      const prog = 1 - a;
+      const r = p.size * (0.55 + prog * 0.9);
+      ctx.globalAlpha = a * a * (0.5 + p.power * 0.45);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = 'rgba(255,236,190,0.95)';
+      ctx.lineWidth = (2.4 + p.power * 2.6) * a;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, 0, r, -0.85, 0.85); ctx.stroke();
+      ctx.globalAlpha *= 0.5;
+      ctx.strokeStyle = 'rgba(255,170,70,0.9)';
+      ctx.lineWidth *= 0.55;
+      ctx.beginPath(); ctx.arc(0, 0, r*1.28, -0.6, 0.6); ctx.stroke();
+      ctx.restore(); continue;
+    }
+
+    if(p.type === 'kbstreak'){
+      // 넉백 속도선 — 밀려나는 방향 뒤로 늘어지는 잔상
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.globalAlpha = a * a * 0.75;
+      const lg = ctx.createLinearGradient(-p.size, 0, p.size*0.25, 0);
+      lg.addColorStop(0, 'rgba(220,200,170,0)');
+      lg.addColorStop(0.6, 'rgba(240,224,196,0.7)');
+      lg.addColorStop(1, 'rgba(255,250,235,0.95)');
+      ctx.strokeStyle = lg;
+      ctx.lineWidth = 2.8 * (0.5 + a);
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-p.size, 0); ctx.lineTo(p.size*0.25, 0); ctx.stroke();
+      ctx.restore(); continue;
+    }
+
+    if(p.type === 'hitwedge'){
+      // 피격 방향 쐐기 — 어느 방향에서 맞았는지 한눈에
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      const prog = 1 - a;
+      const r = p.size * (0.5 + prog * 0.85);
+      ctx.globalAlpha = a * a * 0.85;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = p.crit ? 'rgba(255,240,180,0.95)' : 'rgba(255,190,180,0.8)';
+      ctx.lineWidth = (p.crit ? 3.4 : 2.2) * a;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(0, 0, r, -0.7, 0.7); ctx.stroke();
+      ctx.restore(); continue;
+    }
+
+    if(p.type === 'shockring'){
+      // 폭발 지면 충격파 — 바닥을 훑는 납작한 링
+      const prog = 1 - a;
+      const r = p.maxRadius * (0.15 + prog * 0.85);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.globalAlpha = a * a * 0.55;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = p.lineW * (1 - prog*0.6);
+      ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.32, 0, 0, Math.PI*2); ctx.stroke();
       ctx.restore(); continue;
     }
 
