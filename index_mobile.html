@@ -717,10 +717,10 @@ const ZOMBIE_DEFS = {
   runner: {
     name: '광속 역귀',
     hp: 22, spd: 115, atk: 6, atkRange: 24, atkCooldown: 0.9,
-    xp: 8, radius: 11,
+    xp: 8, radius: 15,
     knockbackRes: 0.3,
     color: '#5a2a1a', eyeColor: '#ff8040',
-    scale: 0.85,
+    scale: 1.0,
   },
   tanker: {
     name: '거대 역졸',
@@ -2660,9 +2660,9 @@ function performSlash(p, angle){
   for(const z of gs.zombies){
     if(z.dead) continue;
     if((z.swordHitTimer || 0) > 0) continue;
-    const dxx = z.x - p.x, dyy = z.y - p.y;
-    const dist = Math.hypot(dxx, dyy);
-    if(dist > R + z.radius) continue;
+    const dxx = z.x - p.x, dyy = (z.y - z.radius * 1.8) - p.y;
+    const dist = Math.hypot(dxx, dyy * 0.6);
+    if(dist > R + z.radius * 2.2) continue;
     const zAngle = Math.atan2(dyy, dxx);
     let delta = zAngle - angle;
     while(delta >  Math.PI) delta -= Math.PI*2;
@@ -2702,7 +2702,7 @@ function performSlash(p, angle){
 }
 
 // ── 궁수 시스템 ──────────────────────────────────────────────────────
-const ARROW_CONE = Math.PI / 12;   // ±15° 탐지 원뿔 (탐지용, 발사각은 실제 목표 각도)
+const ARROW_Y_BAND = 40;           // Y밴드 탐지 범위 (px): 플레이어 Y ± 이 값 이내 좀비만 조준
 const PLAYER_BODY_OFFSET = 52;     // 플레이어 스프라이트 발→몸통 중심 오프셋(px)
 
 function updateArcherCombat(dt){
@@ -2720,18 +2720,16 @@ function updateArcherCombat(dt){
   else if(movingLeft)   fireDir = Math.PI;
   else                  fireDir = p.facingRight ? 0 : Math.PI;
 
-  // 발사 방향 원뿔(±15°) 안에 좀비가 있어야 발사
+  // Y밴드 탐지: 발사 방향 X + ARROW_Y_BAND 이내 Y
+  const fSign = fireDir === 0 ? 1 : -1;
   let bestDist = Infinity, bestTarget = null;
   for(const z of gs.zombies){
     if(z.dead) continue;
-    const dx = z.x - p.x, dy = z.y - p.y;
-    const dist = Math.hypot(dx, dy);
-    if(dist > 620) continue;
-    const zAngle = Math.atan2(dy, dx);
-    let delta = zAngle - fireDir;
-    while(delta >  Math.PI) delta -= Math.PI*2;
-    while(delta < -Math.PI) delta += Math.PI*2;
-    if(Math.abs(delta) > ARROW_CONE) continue;
+    const dx = z.x - p.x;
+    if(dx * fSign <= 0) continue;                    // 반대 방향 제외
+    if(dx * fSign > 620) continue;                   // 사거리 초과
+    if(Math.abs(z.y - p.y) > ARROW_Y_BAND) continue; // Y밴드 초과
+    const dist = dx * fSign;
     if(dist < bestDist){ bestDist = dist; bestTarget = z; }
   }
 
@@ -2740,10 +2738,9 @@ function updateArcherCombat(dt){
     return;
   }
 
-  // 발사 각도: 실제 목표 방향으로 조준 (좌우 기준 fireDir로 클램프)
+  // 수평 발사: vy=0, fireDir 방향으로 직진
   const originY = p.y - PLAYER_BODY_OFFSET;
-  const aimAngle = Math.atan2((bestTarget.y - PLAYER_BODY_OFFSET) - originY, bestTarget.x - p.x);
-  const baseAngle = aimAngle;
+  const baseAngle = fireDir;
   p.facingRight = (fireDir === 0);
   const spread = p.arrowSpreadCount;
   // 산탄: 홀수 발 기준 ±14° 간격. 발 수가 짝수면 ±7° 부터 시작
@@ -2789,8 +2786,11 @@ function updateArrows(dt){
     // 좀비 충돌 검사
     for(const z of gs.zombies){
       if(z.dead) continue;
-      const dx = z.x - a.x, dy = (z.y - PLAYER_BODY_OFFSET) - a.y;
-      if(Math.hypot(dx,dy) > z.radius + 8) continue;
+      // 스프라이트 범위 기준 충돌: 수평은 스프라이트 너비, 수직은 전체 높이
+      const dx = z.x - a.x;
+      if(Math.abs(dx) > z.radius * 2.4 + 4) continue;      // 스프라이트 너비 절반
+      if(a.y < z.y - z.radius * 4.2 - 4) continue;         // 스프라이트 위쪽 초과
+      if(a.y > z.y + z.radius * 0.6 + 4) continue;         // 스프라이트 아래쪽 초과
       const isCrit = Math.random() < (0.06 + p.critChance);
       let dmg = a.dmg + (Math.random()*4-2);
       if(isCrit) dmg *= 2.2;
@@ -2801,8 +2801,7 @@ function updateArrows(dt){
       if(p.fireDmg > 0) z.fireTimer = Math.max(z.fireTimer, 3.0);
       z.hitFlash = 1;
       const nb = 90 * p.knockbackMult * (1 - z.def.knockbackRes);
-      const nd = Math.max(0.01, Math.hypot(dx,dy));
-      z.knockVx += (dx/nd)*nb; z.knockVy += (dy/nd)*nb;
+      z.knockVx += Math.cos(a.angle) * nb; z.knockVy += Math.sin(a.angle) * nb;
       spawnHitImpact(a.x, a.y, a.angle, isCrit);
       spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit);
       gs.screen.shakeX = isCrit ? 4 : 1.5;
@@ -2921,9 +2920,9 @@ function updateSwordHits(){
       if(z.dead) continue;
       if((z.swordHitTimer || 0) > 0) continue;
 
-      const dx = z.x - tx, dy = z.y - ty;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if(dist > z.radius + hitR) continue;
+      const dx = z.x - tx, dy = (z.y - z.radius * 1.8) - ty;
+      const dist = Math.sqrt(dx*dx + (dy*0.6)*(dy*0.6));
+      if(dist > z.radius * 2.2 + hitR) continue;
 
       z.swordHitTimer = 0.45;
       const isCrit = Math.random() < (wDef.critChance + p.critChance);
@@ -3073,29 +3072,36 @@ async function saveRanking(score, level, time, kills, stageNum, weapon){
   };
   _saveLocal(entry);
 
-  let ghOk = false;
-  try {
-    // Cloudflare Worker 프록시로 저장 (토큰은 Worker 환경변수에 보관)
-    const putRes = await fetch(RANK_WORKER, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ts: _lastTs, entry })
-    });
-    const result = await putRes.json();
-    if(result.ok){ ghOk = true; }
-    else { console.warn('[rank] worker save failed:', result.status); }
-  } catch(e) { console.warn('[rank] worker fetch error:', e); }
-
-  // 순위: GitHub 성공 시 전체 목록 기준, 실패 시 로컬 기준
-  if(ghOk){
-    try {
-      const global = await loadRankings();
-      const gi = global.findIndex(r => r.ts === _lastTs);
-      if(gi >= 0) return gi + 1;
-    } catch(_){}
-  }
+  // 로컬 순위 즉시 반환 — 네트워크 업로드는 백그라운드에서
   const local = _loadLocal();
-  return local.findIndex(r => r.ts === _lastTs) + 1;
+  const localRank = local.findIndex(r => r.ts === _lastTs) + 1;
+  _uploadAndRefreshRank(entry).catch(() => {});
+  return localRank;
+}
+
+// 백그라운드 네트워크 저장 + 전역 랭킹 업데이트
+async function _uploadAndRefreshRank(entry){
+  const putRes = await fetch(RANK_WORKER, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ts: entry.ts, entry })
+  });
+  const result = await putRes.json();
+  if(!result.ok){ console.warn('[rank] worker save failed:', result.status); return; }
+
+  const global = await loadRankings();
+  const gi = global.findIndex(r => r.ts === entry.ts);
+  if(gi < 0) return;
+  const globalRank = gi + 1;
+
+  // 게임오버 화면이 아직 보이는 경우에만 업데이트
+  if(phase !== 'gameover') return;
+  document.getElementById('gorank').textContent =
+    globalRank === 1 ? '🏆 신기록!' : `🌐 글로벌 ${globalRank}위`;
+  const tbody = document.getElementById('rktbody');
+  _buildRankRows(global, tbody, entry.ts);
+  const myRow = tbody.querySelector('tr.cur');
+  if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 100);
 }
 
 // 전체 점수 로드: scores/ 폴더 파일 목록 → 각 파일 fetch → 정렬
@@ -3134,7 +3140,7 @@ async function loadRankings(){
 }
 
 const RANK_MEDAL = ['🥇','🥈','🥉'];
-const WEAPON_LABEL = { slash: '검객', bow: '궁수', pray: '무당' };
+const WEAPON_LABEL = { slash: '검객', bow: '궁수', pray: '무당', talisman: '무당' };
 function _buildRankRows(list, tbody, myTs){
   tbody.innerHTML = '';
   if(list.length === 0){
@@ -3158,13 +3164,11 @@ function _buildRankRows(list, tbody, myTs){
 
 function renderRankingTable(myRank){
   const tbody = document.getElementById('rktbody');
-  tbody.innerHTML = '<tr><td colspan="7" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
-  loadRankings().then(list => {
-    _buildRankRows(list, tbody, _lastTs);
-    // 내 행이 보이도록 스크롤
-    const myRow = tbody.querySelector('tr.cur');
-    if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 100);
-  });
+  // 로컬 데이터 즉시 표시
+  const localList = _loadLocal();
+  _buildRankRows(localList, tbody, _lastTs);
+  const myRow = tbody.querySelector('tr.cur');
+  if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 50);
 }
 
 // ── 캔버스에 콤보 카운터 오버레이 ──
@@ -3233,8 +3237,8 @@ function updateZombies(dt){
     // 애니메이션 상태 + 4프레임 업데이트 (이전 프레임 vx/vy 기준)
     z.animClock += dt;
     const zMoving = Math.abs(z.vx) > 5 || Math.abs(z.vy) > 5;
-    z.animState = zMoving ? 'walk' : 'idle';
     const isRunner = (z.type === 'runner' || z.type === 'berserker');
+    z.animState = (zMoving || isRunner) ? 'walk' : 'idle';
     z.animFrame = z.animState === 'walk'
       ? Math.floor(z.animClock * (isRunner ? 10 : 6)) % 4
       : Math.floor(z.animClock * 1.5) % 2;
@@ -3258,6 +3262,7 @@ function updateZombies(dt){
     // AI 추적
     const dx = p.x - z.x, dy = p.y - z.y;
     const dist = Math.sqrt(dx*dx+dy*dy);
+    const atkDist = Math.sqrt(dx*dx + (dy*0.55)*(dy*0.55));
     let moveX = 0, moveY = 0;
 
     // 원거리형과 근접형 AI 분기
@@ -3266,7 +3271,7 @@ function updateZombies(dt){
       else if(dist < z.def.safeRange) { moveX = -dx/dist; moveY = -dy/dist; } // 후퇴
       // 사거리 안, 안전거리 밖 → 제자리 유지
     } else {
-      if(dist > z.def.atkRange){ moveX = dx/dist; moveY = dy/dist; }
+      if(atkDist > z.def.atkRange){ moveX = dx/dist; moveY = dy/dist; }
     }
 
     // 좀비 간 분리 (겹침 방지)
@@ -3326,7 +3331,7 @@ function updateZombies(dt){
           z.fired = false;
         }
       }
-    } else if(dist <= z.def.atkRange){
+    } else if(atkDist <= z.def.atkRange){
       z.atkTimer -= dt;
       if(z.atkTimer <= 0){
         z.atkTimer = z.def.atkCooldown;
@@ -3870,7 +3875,7 @@ function checkPlayerDeath(){
   }
 }
 
-async function _triggerGameOver(){
+function _triggerGameOver(){
   try {
     BGM.fadeOut(1.0);
     setTimeout(()=>{ try { BGM.ending(); } catch(e){ console.warn('BGM.ending failed:', e); } applyMute(); }, 1150);
@@ -3878,15 +3883,28 @@ async function _triggerGameOver(){
   phase = 'gameover';
   const mm=Math.floor(gameTime/60), ss=Math.floor(gameTime%60);
   const finalScore = gs.score;
+
+  // 로컬 저장 + 순위 계산 (동기, 즉시)
+  _lastTs = Date.now();
+  const entry = {
+    name: _playerName(), score: finalScore, level: gs.player.level, kills: gs.kills,
+    stage: stage||1, time: `${mm}:${ss<10?'0':''}${ss}`,
+    weapon: gs.player.weapon||'talisman', ts: _lastTs
+  };
+  _saveLocal(entry);
+  const localList = _loadLocal();
+  const myRank = Math.max(1, localList.findIndex(r => r.ts === _lastTs) + 1);
+
+  // UI 즉시 렌더
   document.getElementById('goscore').textContent = finalScore.toLocaleString();
-  document.getElementById('gorank').textContent = '랭킹 계산 중…';
+  document.getElementById('gorank').textContent = myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
   document.getElementById('gost').textContent =
     `STAGE ${stage}  ·  생존 ${mm}분 ${ss}초  ·  Lv.${gs.player.level}  ·  처치 ${gs.kills}  ·  최대콤보 ${gs.bestCombo}연`;
   showPanel('go');
-  const myRank = await saveRanking(finalScore, gs.player.level, gameTime, gs.kills, stage, gs.player.weapon);
-  document.getElementById('gorank').textContent =
-    myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
   renderRankingTable(myRank);
+
+  // 네트워크 업로드 + 글로벌 랭킹 갱신은 백그라운드
+  _uploadAndRefreshRank(entry).catch(() => {});
 }
 
 // ── 스테이지 클리어 ─────────────────────────────────────────────
@@ -5463,10 +5481,11 @@ function drawZombieSprite(z, flash){
   };
   const Z_FRAMES = FRAMES_BY_SPRITE[spriteKey] || FRAMES_BY_SPRITE.z_normal;
   let zState;
-  if(z.dead)                                   zState = 'death';
-  else if(flash)                               zState = 'hit';
-  else if(z.atkTimer < 0.3 && z.atkTimer > 0) zState = 'attack';
-  else                                         zState = z.animState || 'walk';
+  const atkWindow = (type === 'runner' || type === 'berserker') ? 0.0 : 0.30;
+  if(z.dead)                                        zState = 'death';
+  else if(flash)                                    zState = 'hit';
+  else if(z.atkTimer < atkWindow && z.atkTimer > 0) zState = 'attack';
+  else                                              zState = z.animState || 'walk';
   const zSeq = Z_FRAMES[zState];
   const zFrameEntry = zSeq[(z.animFrame || 0) % zSeq.length];
   const [sc, sr, zFrameFlip] = zFrameEntry;
