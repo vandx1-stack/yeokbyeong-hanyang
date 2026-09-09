@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>역병의 한양 — 빌드 목록</title>
+<link rel="icon" type="image/png" href="assets/icon.png">
+<style>
+:root{--gold:#c8a030;--gold-hi:#f0c860;--txt-2:#b9945a;--txt-3:#7d5c2e;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{
+  min-height:100dvh;background:radial-gradient(ellipse at 50% 20%,#180a01 0%,#040100 70%);
+  color:var(--txt-2);font-family:'Noto Serif KR','Malgun Gothic',serif;
+  display:flex;flex-direction:column;align-items:center;
+  padding:calc(36px + env(safe-area-inset-top)) 18px calc(36px + env(safe-area-inset-bottom));
+}
+h1{font-size:22px;font-weight:900;color:#cc1010;letter-spacing:5px;
+  text-shadow:0 0 22px rgba(180,0,0,.6);text-align:center;}
+.sub{font-size:10px;color:var(--txt-3);letter-spacing:3px;margin-top:6px;text-align:center;}
+.rule{width:100%;max-width:560px;height:1px;margin:22px 0;
+  background:linear-gradient(90deg,transparent,rgba(180,110,25,.5) 50%,transparent);}
+ul{list-style:none;width:100%;max-width:560px;display:flex;flex-direction:column;gap:12px;}
+a.build{
+  display:block;padding:14px 16px;text-decoration:none;
+  background:linear-gradient(180deg,rgba(20,10,2,.96),rgba(8,3,0,.98));
+  border:1px solid rgba(120,74,14,.45);border-left:4px solid rgba(150,90,18,.7);
+  border-radius:5px;transition:border-color .12s,transform .1s;
+}
+a.build:active{transform:scale(.99);}
+a.build.current{border-left-color:var(--gold);border-color:rgba(190,120,30,.7);}
+.row{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+.ver{font-size:17px;font-weight:900;color:var(--gold-hi);font-family:monospace;letter-spacing:1px;}
+.tag{font-size:9px;font-weight:700;letter-spacing:2px;padding:2px 7px;border-radius:2px;}
+.tag.now{color:#0f0800;background:linear-gradient(180deg,#d8a83a,#a87418);}
+.tag.old{color:#c8843c;border:1px solid rgba(170,95,25,.6);}
+.note{font-size:11px;color:var(--txt-2);margin-top:8px;line-height:1.75;}
+.note b{color:#d8ab52;font-weight:700;}
+.foot{font-size:10px;color:#5a4020;margin-top:26px;text-align:center;line-height:1.9;max-width:560px;}
+</style>
+</head>
+<body>
+  <h1>역병의 한양</h1>
+  <div class="sub">B U I L D &nbsp; L I S T</div>
+  <div class="rule"></div>
+  <ul>
+    <li>
+      <a class="build current" href="index_mobile.html">
+        <div class="row"><span class="ver">v1.1.0</span><span class="tag now">최신</span></div>
+        <div class="note">
+          모바일 UI 전면 개선.<br>
+          <b>HUD 스탯 잘림 수정</b> · 폰트 상향 · 세이프에어리어 대응 ·
+          일시정지/레벨업/캐릭터 선택 화면 개편 ·
+          <b>게임오버 랭킹 오조작 재시작 수정</b>
+        </div>
+      </a>
+    </li>
+    <li>
+      <a class="build" href="index_mobile_v1.html">
+        <div class="row"><span class="ver">v1.0.0</span><span class="tag old">이전 버전</span></div>
+        <div class="note">
+          UI 개선 직전 빌드. 비교·롤백 확인용으로 보존합니다.
+        </div>
+      </a>
+    </li>
+  </ul>
+  <div class="foot">
+    두 빌드는 닉네임·랭킹 데이터를 공유합니다.<br>
+    버그리포트 시 타이틀 화면 좌하단의 <b>버전 표기</b>를 함께 남겨주세요.
+  </div>
+</body>
+</html>
