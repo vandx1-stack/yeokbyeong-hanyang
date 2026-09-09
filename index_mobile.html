@@ -999,10 +999,19 @@ function hideHUD(){ document.getElementById('hud').classList.add('hid'); _showPa
 
 function showTitleRanking(){
   const tbody = document.getElementById('trk-body');
-  tbody.innerHTML = '<tr><td colspan="7" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
+  // 캐시가 있으면 즉시 표시, 없으면 로컬 데이터로 일단 채움
+  const immediate = _rankCache || _loadLocal();
+  if(immediate.length > 0){
+    _buildRankRows(immediate, tbody, -1);
+  } else {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#5a3820;padding:8px">랭킹 불러오는 중…</td></tr>';
+  }
   document.getElementById('ts').classList.add('hid');
   document.getElementById('title-rank').classList.remove('hid');
-  loadRankings().then(list => _buildRankRows(list, tbody, -1));
+  // 캐시가 없거나 오래됐으면 백그라운드에서 갱신
+  if(!_rankCache || Date.now() - _rankCacheTs > 60000){
+    loadRankings().then(list => _buildRankRows(list, tbody, -1)).catch(()=>{});
+  }
 }
 function hideTitleRanking(){
   document.getElementById('title-rank').classList.add('hid');
@@ -3045,6 +3054,7 @@ function _setPlayerName(n){
 }
 
 let _lastTs = 0;
+let _rankCache = null, _rankCacheTs = 0;
 
 // 로컬 fallback
 function _saveLocal(entry){
@@ -3104,35 +3114,23 @@ async function _uploadAndRefreshRank(entry){
   if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 100);
 }
 
-// 전체 점수 로드: scores/ 폴더 파일 목록 → 각 파일 fetch → 정렬
+// 전체 점수 로드: Worker GET 단일 호출 (Worker에서 GH 집계·캐싱 처리)
 async function loadRankings(){
+  // 세션 내 메모리 캐시 (60초 TTL)
+  if(_rankCache && Date.now() - _rankCacheTs < 60000) return _rankCache;
   try {
-    const listRes = await fetch(GH_SCORES, {
+    const res = await fetch(RANK_WORKER, {
+      method: 'GET',
       signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
     });
-    if(!listRes.ok){
-      console.warn('[rank] list fetch failed:', listRes.status, listRes.statusText);
-      throw new Error('list fetch ' + listRes.status);
+    if(!res.ok) throw new Error('worker GET ' + res.status);
+    const list = await res.json();
+    if(Array.isArray(list) && list.length > 0){
+      _rankCache = list;
+      _rankCacheTs = Date.now();
+      return list;
     }
-    const files = await listRes.json();
-    if(!Array.isArray(files) || files.length === 0) return _loadLocal();
-
-    // 최대 1000개 파일 (파일명이 timestamp이므로 내림차순 = 최신)
-    const targets = files.sort((a,b) => b.name.localeCompare(a.name)).slice(0, 1000);
-    // 50개씩 나눠 병렬 fetch (한번에 1000개 요청 방지)
-    const CHUNK = 50;
-    const list = [];
-    for(let i = 0; i < targets.length; i += CHUNK){
-      const chunk = targets.slice(i, i + CHUNK);
-      const results = await Promise.allSettled(
-        chunk.map(f => fetch(GH_RAW + f.name).then(r => r.json()))
-      );
-      for(const r of results){
-        if(r.status === 'fulfilled' && r.value && r.value.score) list.push(r.value);
-      }
-    }
-    list.sort((a,b) => b.score - a.score);
-    return list.slice(0, 1000);
+    return _loadLocal();
   } catch(e) {
     console.warn('[rank] loadRankings fallback to local:', e);
     return _loadLocal();
