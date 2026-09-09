@@ -295,6 +295,10 @@ body{
 .rktbl tr.cur td:first-child{box-shadow:inset 3px 0 0 rgba(230,160,40,.95);}
 .rktbl tr.rk1 td{color:#e8bd44;}.rktbl tr.rk2 td{color:#bcb4ad;}.rktbl tr.rk3 td{color:#c07a4c;}
 
+.rank-src{font-size:8px;letter-spacing:1px;margin:2px 0 8px;text-align:center;min-height:11px;}
+.rank-src.ok{color:#6a5228;}
+.rank-src.err{color:#c86a2a;}
+
 /* ════════════════════════ 패널 박스 ════════════════════════ */
 .panel-box{
   display:flex;flex-direction:column;align-items:center;
@@ -609,6 +613,7 @@ body{
         <tbody id="trk-body"></tbody>
       </table>
     </div>
+    <div id="trk-src" class="rank-src"></div>
     <button class="tbtn" id="btn-rank-back">돌아가기</button>
   </div>
 </div>
@@ -715,6 +720,7 @@ body{
     <div id="gorank"></div>
     <div id="gost"></div>
     <div id="gorankwrap"><table class="rktbl"><thead><tr><th>순위</th><th>이름</th><th>직업</th><th>점수</th><th>스테이지</th><th>레벨</th><th>처치</th></tr></thead><tbody id="rktbody"></tbody></table></div>
+    <div id="go-rank-src" class="rank-src"></div>
     <div class="gobtnwrap">
       <button class="tbtn go-retry-btn" id="btn-go-retry">다시 도전</button>
       <button class="tbtn go-home-btn" id="btn-go-home">메인화면</button>
@@ -1019,7 +1025,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -1178,9 +1184,16 @@ function showTitleRanking(){
   document.getElementById('ts').classList.add('hid');
   document.getElementById('title-rank').classList.remove('hid');
   // 캐시가 없거나 오래됐으면 백그라운드에서 갱신
+  const srcEl = document.getElementById('trk-src');
+  if(srcEl) srcEl.textContent = '';
   if(!_rankCache || Date.now() - _rankCacheTs > 60000){
-    loadRankings().then(list => { _buildRankRows(list, tbody, -1); _scrollToMyRow(tbody); }).catch(()=>{});
+    loadRankings().then(list => {
+      _buildRankRows(list, tbody, -1);
+      _renderRankSource(srcEl);
+      _scrollToMyRow(tbody);
+    }).catch(()=>{ _renderRankSource(srcEl); });
   } else {
+    _renderRankSource(srcEl);
     _scrollToMyRow(tbody);
   }
 }
@@ -3306,7 +3319,7 @@ async function _uploadAndRefreshRank(entry){
   const result = await putRes.json();
   if(!result.ok){ console.warn('[rank] worker save failed:', result.status); return; }
 
-  const global = await loadRankings();
+  const global = await loadRankings({ fresh: true });
   const gi = global.findIndex(r => r.ts === entry.ts);
   if(gi < 0) return;
   const globalRank = gi + 1;
@@ -3317,30 +3330,55 @@ async function _uploadAndRefreshRank(entry){
     globalRank === 1 ? '🏆 신기록!' : `🌐 글로벌 ${globalRank}위`;
   const tbody = document.getElementById('rktbody');
   _buildRankRows(global, tbody, entry.ts);
+  _renderRankSource(document.getElementById('go-rank-src'));
   const myRow = tbody.querySelector('tr.cur');
   if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 100);
 }
 
+// 마지막 조회가 실제 글로벌 데이터였는지 여부.
+// 이전 구현은 Worker가 실패해도 조용히 로컬 기록을 대신 반환해, 글로벌 집계가
+// 몇 달 멈춰 있어도 화면상으로는 정상처럼 보였다. 상태를 남겨 UI에 표시한다.
+let _rankIsGlobal = false;
+let _rankError = '';
+
 // 전체 점수 로드: Worker GET 단일 호출 (Worker에서 GH 집계·캐싱 처리)
-async function loadRankings(){
-  // 세션 내 메모리 캐시 (60초 TTL)
-  if(_rankCache && Date.now() - _rankCacheTs < 60000) return _rankCache;
+async function loadRankings(opts){
+  const fresh = opts && opts.fresh;
+  if(!fresh && _rankCache && Date.now() - _rankCacheTs < 60000) return _rankCache;
   try {
-    const res = await fetch(RANK_WORKER, {
+    const res = await fetch(RANK_WORKER + (fresh ? '?fresh=1' : ''), {
       method: 'GET',
       signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
     });
-    if(!res.ok) throw new Error('worker GET ' + res.status);
-    const list = await res.json();
-    if(Array.isArray(list) && list.length > 0){
-      _rankCache = list;
-      _rankCacheTs = Date.now();
-      return list;
+    if(!res.ok){
+      const detail = res.headers.get('X-Rank-Error') || ('HTTP ' + res.status);
+      throw new Error(detail);
     }
-    return _loadLocal();
+    const list = await res.json();
+    if(!Array.isArray(list)) throw new Error('unexpected payload');
+    _rankCache = list;
+    _rankCacheTs = Date.now();
+    _rankIsGlobal = true;
+    _rankError = '';
+    return list;
   } catch(e) {
-    console.warn('[rank] loadRankings fallback to local:', e);
+    _rankIsGlobal = false;
+    _rankError = String(e && e.message || e).slice(0, 120);
+    console.warn('[rank] 글로벌 랭킹 조회 실패 — 로컬 기록으로 대체:', _rankError);
     return _loadLocal();
+  }
+}
+
+// 랭킹 표 아래에 데이터 출처를 표시. 글로벌 집계가 끊기면 바로 눈에 띄도록 한다.
+function _renderRankSource(el){
+  if(!el) return;
+  if(_rankIsGlobal){
+    el.textContent = '🌐 전체 서버 기록';
+    el.className = 'rank-src ok';
+  } else {
+    el.textContent = '⚠ 서버 연결 실패 — 이 기기의 기록만 표시 중';
+    el.className = 'rank-src err';
+    el.title = _rankError || '';
   }
 }
 
@@ -3375,9 +3413,10 @@ function _buildRankRows(list, tbody, myTs){
 
 function renderRankingTable(myRank){
   const tbody = document.getElementById('rktbody');
-  // 로컬 데이터 즉시 표시
+  // 로컬 데이터 즉시 표시 (글로벌 응답이 오면 _uploadAndRefreshRank가 갱신)
   const localList = _loadLocal();
   _buildRankRows(localList, tbody, _lastTs);
+  _renderRankSource(document.getElementById('go-rank-src'));
   const myRow = tbody.querySelector('tr.cur');
   if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 50);
 }
