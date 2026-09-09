@@ -1019,7 +1019,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -2906,7 +2906,7 @@ function performSlash(p, angle){
       z.hitFlash = 1;
       const ox = (Math.random()-0.5)*12, oy = (Math.random()-0.5)*8;
       spawnHitImpact(z.x + ox, z.y - z.radius*0.5 + oy, angle, isCrit);
-      spawnDmgNum(z.x + ox, z.y - z.radius - h*14, dmg, isCrit);
+      spawnDmgNum(z.x + ox, z.y - z.radius, dmg, isCrit, z);
 
       gs.screen.shakeX = isCrit ? 5 : 2;
       gs.screen.shakeY = isCrit ? 3 : 1;
@@ -3021,7 +3021,7 @@ function updateArrows(dt){
       const nb = 90 * p.knockbackMult * (1 - z.def.knockbackRes);
       applyKnockback(z, Math.cos(a.angle), Math.sin(a.angle), nb);
       spawnHitImpact(a.x, a.y, a.angle, isCrit);
-      spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit);
+      spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit, z);
       gs.screen.shakeX = isCrit ? 4 : 1.5;
       gs.screen.shakeY = isCrit ? 2 : 0.8;
       gs.hitStop = isCrit ? 0.04 : 0.01;
@@ -3159,7 +3159,7 @@ function updateSwordHits(){
 
       z.hitFlash = 1;
       spawnHitImpact(tx, ty, angle, isCrit);
-      spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit);
+      spawnDmgNum(z.x, z.y - z.radius, dmg, isCrit, z);
       sndHwando(isCrit);
 
       gs.screen.shakeX = isCrit ? 6 : 3;
@@ -3644,6 +3644,12 @@ function spawnHitImpact(x, y, hitAngle, isCrit){
     size: isCrit ? 26 : 16,
   });
 
+  // ── 치명타 전용 연출 ──
+  // spawnShatter()는 황금 파편 + 황금 링까지 전부 구현돼 있었으나 어디서도
+  // 호출되지 않는 죽은 코드였다. 치명타는 혈흔·숫자·화면흔들림이 커지는
+  // '증폭'만 있었고 전용 시각 신호가 없었기에 여기서 연결한다.
+  if(isCrit) spawnShatter(x, y);
+
   // ── 피격 방향 쐐기 ──
   // 혈흔이 사방으로 퍼지기만 하면 어느 방향에서 맞았는지 읽히지 않는다.
   // 타격 방향으로 열린 짧은 호를 얹어 충격의 방향을 명확히 한다.
@@ -3952,16 +3958,44 @@ function spawnXpOrb(x, y, xpVal){
   });
 }
 
-function spawnDmgNum(x, y, dmg, crit){
-  gs.dmgNumbers.push({
+// 같은 대상에 이 시간 안에 들어온 피해는 숫자를 새로 띄우지 않고 하나로 합산한다.
+// 검객의 다단 참격(최대 5회)이나 부적 다중 타격이 매 히트마다 숫자를 띄워
+// 난전에서 화면이 숫자로 뒤덮이고 정작 캐릭터와 적이 안 보이던 문제를 막는다.
+const DMG_MERGE_WINDOW = 0.5;
+const DMG_NUM_MAX = 26;   // 동시 표시 상한
+
+function spawnDmgNum(x, y, dmg, crit, target){
+  const prev = target && target._dn;
+  if(prev && prev.life > 0 && prev.age < DMG_MERGE_WINDOW){
+    prev.dmg  += dmg;
+    prev.hits += 1;
+    if(crit) prev.crit = true;
+    prev.text = (prev.crit ? '!' : '') + prev.dmg;
+    prev.life = Math.max(prev.life, 0.75);
+    prev.popT = 0.16;                     // 합산될 때마다 살짝 튀어오른다
+    prev.vy   = Math.min(prev.vy, -55);
+    return;
+  }
+  const n = {
     x, y,
     vx: (Math.random()-0.5)*20,
     vy: -70 - Math.random()*30,
-    text: crit ? '!' + dmg : '' + dmg,
-    crit,
-    life: 1.0,
-    alpha: 1,
-  });
+    dmg, hits: 1, crit,
+    text: (crit ? '!' : '') + dmg,
+    life: 1.0, alpha: 1, age: 0, popT: 0.16,
+  };
+  gs.dmgNumbers.push(n);
+  if(target) target._dn = n;
+  if(gs.dmgNumbers.length > DMG_NUM_MAX) _trimDmgNumbers();
+}
+
+function _trimDmgNumbers(){
+  const list = gs.dmgNumbers;
+  // 오래된 일반 숫자부터 정리 — 크리티컬과 스코어 팝업은 마지막까지 남긴다
+  for(let i=0; i<list.length && list.length > DMG_NUM_MAX; i++){
+    if(!list[i].crit && !list[i].isScore){ list.splice(i,1); i--; }
+  }
+  while(list.length > DMG_NUM_MAX) list.shift();
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -4144,6 +4178,8 @@ function updateDmgNumbers(dt){
     const n=gs.dmgNumbers[i];
     n.life -= dt;
     if(n.life <= 0){ gs.dmgNumbers.splice(i,1); continue; }
+    n.age = (n.age || 0) + dt;
+    if(n.popT > 0) n.popT -= dt;
     n.x += n.vx*dt;
     n.y += n.vy*dt;
     n.vy += 40*dt;
@@ -6855,20 +6891,39 @@ function drawDmgNumbers(){
       ctx.fillStyle = n.scoreColor;
       ctx.fillText(n.text, n.x, n.y);
       ctx.shadowBlur = 0;
-    } else if(n.crit){
-      ctx.font = 'bold 22px serif';
-      ctx.shadowColor='#ff6000'; ctx.shadowBlur=10;
-      ctx.fillStyle='#ffcc00';
-      ctx.fillText(n.text, n.x, n.y);
-      ctx.shadowBlur=0;
-      ctx.fillStyle='rgba(255,255,180,0.7)';
-      ctx.fillText(n.text, n.x-0.5, n.y-0.5);
     } else {
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillStyle='rgba(0,0,0,0.55)';
-      ctx.fillText(n.text, n.x+1, n.y+1);
-      ctx.fillStyle='#ff5050';
-      ctx.fillText(n.text, n.x, n.y);
+      // 합산 피해량이 클수록 크게 — 큰 한 방이 한눈에 읽히도록
+      const mag = Math.min(1, Math.log10(Math.max(1, n.dmg || 1)) / 3);
+      const base = (n.crit ? 19 : 13) + mag * 11;
+      // 합산될 때마다 튀어오르는 팝 연출
+      const pop = n.popT > 0 ? 1 + (n.popT / 0.16) * 0.28 : 1;
+      ctx.translate(n.x, n.y);
+      ctx.scale(pop, pop);
+      ctx.font = `900 ${base}px 'Noto Serif KR', sans-serif`;
+      // 어두운 배경에서도 읽히도록 외곽선을 두른다
+      ctx.lineWidth = n.crit ? 3.2 : 2.6;
+      ctx.strokeStyle = 'rgba(0,0,0,0.78)';
+      ctx.lineJoin = 'round';
+      ctx.strokeText(n.text, 0, 0);
+      if(n.crit){
+        ctx.shadowColor = '#ff6000'; ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ffcf28';
+        ctx.fillText(n.text, 0, 0);
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.fillStyle = '#ff6a5a';
+        ctx.fillText(n.text, 0, 0);
+      }
+      // 합산 히트 수 — 몇 대 맞혔는지 작은 배지로
+      if(n.hits > 1){
+        ctx.font = `700 ${base*0.48}px monospace`;
+        ctx.fillStyle = n.crit ? 'rgba(255,225,150,0.9)' : 'rgba(255,180,170,0.85)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 2;
+        const tag = `×${n.hits}`;
+        const w = ctx.measureText(n.text).width;
+        ctx.strokeText(tag, w*0.5 + base*0.42, -base*0.30);
+        ctx.fillText(tag,   w*0.5 + base*0.42, -base*0.30);
+      }
     }
     ctx.restore();
   }
