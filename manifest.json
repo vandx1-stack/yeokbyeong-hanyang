@@ -2,7 +2,7 @@
   "name": "역병의 한양",
   "short_name": "역병의 한양",
   "description": "Plague of Hanyang — 임진왜란 좀비 로그라이크",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "start_url": "./index_mobile.html",
   "display": "standalone",
   "orientation": "landscape",
