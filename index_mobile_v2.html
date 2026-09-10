@@ -1057,7 +1057,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -3491,12 +3491,12 @@ async function _loadRankingsDirect(){
   const settled = await Promise.allSettled(
     picked.map(f => fetch(GH_RAW + f.name).then(r => r.ok ? r.json() : null))
   );
-  const list = settled
+  // 목록 조회가 성공한 이상 결과가 0건이어도 '연결 성공'이다.
+  // 여기서 예외를 던지면 정상 상태를 장애로 오인하게 된다.
+  return settled
     .map(r => r.status === 'fulfilled' ? r.value : null)
     .filter(r => r && typeof r.score === 'number')
     .sort((a, b) => b.score - a.score);
-  if(list.length === 0) throw new Error('github direct: 유효 기록 없음');
-  return list;
 }
 
 // 전체 점수 로드
@@ -3507,6 +3507,9 @@ async function loadRankings(opts){
   const fresh = opts && opts.fresh;
   if(!fresh && _rankCache && Date.now() - _rankCacheTs < 60000) return _rankCache;
 
+  // 중요: '조회 성공'과 'v2 기록 존재'는 다른 문제다.
+  // 전에는 v2 기록이 0건이면 예외로 처리해 서버가 멀쩡한데도 "연결 실패"로
+  // 표시했다. v2 출시 직후에는 기록이 0건인 것이 정상이다.
   const errs = [];
   try {
     const res = await fetch(RANK_WORKER + (fresh ? '?fresh=1' : ''), {
@@ -3516,17 +3519,13 @@ async function loadRankings(opts){
     if(!res.ok) throw new Error(res.headers.get('X-Rank-Error') || ('HTTP ' + res.status));
     const list = await res.json();
     if(!Array.isArray(list)) throw new Error('unexpected payload');
-    const v2 = _onlyV2(list);
-    if(v2.length === 0) throw new Error('v2 기록 없음');
-    return _acceptGlobal(v2, 'worker');
+    return _acceptGlobal(_onlyV2(list), 'worker');
   } catch(e){
     errs.push('worker: ' + String(e && e.message || e));
   }
 
   try {
-    const v2 = _onlyV2(await _loadRankingsDirect());
-    if(v2.length === 0) throw new Error('v2 기록 없음');
-    return _acceptGlobal(v2, 'github');
+    return _acceptGlobal(_onlyV2(await _loadRankingsDirect()), 'github');
   } catch(e){
     errs.push('github: ' + String(e && e.message || e));
   }
@@ -3574,16 +3573,21 @@ function _rankFallback(){
 function _renderRankSource(el){
   if(!el) return;
   if(_rankIsGlobal){
-    el.textContent = _rankSource === 'github'
-      ? '🌐 전체 서버 기록 (직접 조회)'
-      : '🌐 전체 서버 기록';
+    const via = _rankSource === 'github' ? ' (직접 조회)' : '';
+    el.textContent = (_rankCache && _rankCache.length === 0)
+      ? `🌐 서버 연결됨${via} · 아직 v2 기록이 없습니다 — 첫 기록의 주인공이 되어보세요`
+      : `🌐 전체 서버 기록${via}`;
     el.className = 'rank-src ok';
   } else if(_rankSource === 'snapshot'){
     const mins = Math.max(1, Math.round((Date.now() - _rankSnapshotAt) / 60000));
     el.textContent = `⚠ 서버 연결 실패 — ${mins}분 전 전체 기록 표시 중`;
     el.className = 'rank-src err';
   } else {
-    el.textContent = '⚠ 서버 연결 실패 — 이 기기의 기록만 표시 중';
+    // 원인을 짧게 함께 보여준다. 모바일에서는 툴팁을 볼 수 없어
+    // 장애 신고 때 원인을 알 방법이 없었다.
+    const why = (_rankError || '').replace(/\s+/g, ' ').slice(0, 70);
+    el.textContent = '⚠ 서버 연결 실패 — 이 기기의 기록만 표시 중'
+                   + (why ? `  [${why}]` : '');
     el.className = 'rank-src err';
   }
   el.title = _rankError || '';
