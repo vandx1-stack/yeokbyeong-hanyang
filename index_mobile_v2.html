@@ -1057,7 +1057,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '2.0.2';
+const APP_VERSION = '2.0.3';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -1204,30 +1204,49 @@ function showHUD(){
 }
 function hideHUD(){ document.getElementById('hud').classList.add('hid'); _showPauseBtn(false); }
 
+// 서버 목록과 이 기기의 기록을 합쳐서 보여준다.
+// 서버 조회가 성공하면 그 목록만 그렸는데, 방금 끝낸 판은 아직 서버에
+// 반영되기 전(업로드 지연·raw CDN 캐시)이라 "방금 플레이했는데 내 기록이
+// 없다"가 됐다. ts로 중복을 제거해 합친다.
+function _mergeWithLocal(list){
+  const merged = Array.isArray(list) ? list.slice() : [];
+  const seen = new Set(merged.map(r => r && r.ts));
+  for(const r of _loadLocal()){
+    if(r && !seen.has(r.ts)){ merged.push(r); seen.add(r.ts); }
+  }
+  return merged.sort((a, b) => b.score - a.score);
+}
+
 function showTitleRanking(){
   const tbody = document.getElementById('trk-body');
-  // 캐시가 있으면 즉시 표시, 없으면 로컬 데이터로 일단 채움
-  const immediate = _rankCache || _loadLocal();
-  if(immediate.length > 0){
-    _buildRankRows(immediate, tbody, -1);
-  } else {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:#5a3820;padding:10px">랭킹 불러오는 중…</td></tr>';
-  }
+  const srcEl = document.getElementById('trk-src');
   document.getElementById('ts').classList.add('hid');
   document.getElementById('title-rank').classList.remove('hid');
-  // 캐시가 없거나 오래됐으면 백그라운드에서 갱신
-  const srcEl = document.getElementById('trk-src');
-  if(srcEl) srcEl.textContent = '';
-  if(!_rankCache || Date.now() - _rankCacheTs > 60000){
-    loadRankings().then(list => {
-      _buildRankRows(list, tbody, -1);
-      _renderRankSource(srcEl);
-      _scrollToMyRow(tbody);
-    }).catch(()=>{ _renderRankSource(srcEl); });
-  } else {
+
+  // 주의: 빈 배열 []은 truthy다. 예전에는 `_rankCache || _loadLocal()`와
+  // `!_rankCache` 로 캐시 유무를 판단해서, 조회 결과가 0건일 때
+  // "캐시 있음 → 표를 다시 그리지 않음" 경로로 빠져
+  // "랭킹 불러오는 중…" 문구가 영영 남아 있었다.
+  // 캐시 유효성은 배열 내용이 아니라 타임스탬프로만 판단한다.
+  const cacheValid = Array.isArray(_rankCache) && (Date.now() - _rankCacheTs < 60000);
+  if(cacheValid){
+    _buildRankRows(_mergeWithLocal(_rankCache), tbody, -1);
     _renderRankSource(srcEl);
     _scrollToMyRow(tbody);
+    return;
   }
+
+  // 캐시가 없으면 로컬 기록으로 먼저 채우고, 없으면 로딩 표시
+  const local = _loadLocal();
+  if(local.length > 0) _buildRankRows(local, tbody, -1);
+  else tbody.innerHTML = '<tr><td colspan="7" style="color:#5a3820;padding:10px">랭킹 불러오는 중…</td></tr>';
+  if(srcEl) srcEl.textContent = '';
+
+  // 어떤 경로로 끝나든 표를 반드시 다시 그린다
+  loadRankings()
+    .then(list => { _buildRankRows(_mergeWithLocal(list), tbody, -1); })
+    .catch(()  => { _buildRankRows(_loadLocal(), tbody, -1); })
+    .then(()   => { _renderRankSource(srcEl); _scrollToMyRow(tbody); });
 }
 function _scrollToMyRow(tbody){
   const row = tbody.querySelector('tr.cur');
@@ -3470,7 +3489,7 @@ async function _uploadAndRefreshRank(entry){
   document.getElementById('gorank').textContent =
     globalRank === 1 ? '🏆 신기록!' : `🌐 글로벌 ${globalRank}위`;
   const tbody = document.getElementById('rktbody');
-  _buildRankRows(global, tbody, entry.ts);
+  _buildRankRows(_mergeWithLocal(global), tbody, entry.ts);
   _renderRankSource(document.getElementById('go-rank-src'));
   const myRow = tbody.querySelector('tr.cur');
   if(myRow) setTimeout(() => myRow.scrollIntoView({block:'center', behavior:'smooth'}), 100);
@@ -3587,9 +3606,15 @@ function _renderRankSource(el){
   if(!el) return;
   if(_rankIsGlobal){
     const via = _rankSource === 'github' ? ' (직접 조회)' : '';
-    el.textContent = (_rankCache && _rankCache.length === 0)
-      ? `🌐 서버 연결됨${via} · 아직 v2 기록이 없습니다 — 첫 기록의 주인공이 되어보세요`
-      : `🌐 전체 서버 기록${via}`;
+    if(_rankCache && _rankCache.length === 0){
+      // 서버는 정상인데 등록된 기록이 아직 없는 상태.
+      // 표에는 이 기기의 기록을 합쳐 보여주므로 문구도 그에 맞춘다.
+      el.textContent = _loadLocal().length > 0
+        ? `🌐 서버 연결됨${via} · 서버에 등록된 기록이 아직 없어 내 기록만 표시 중`
+        : `🌐 서버 연결됨${via} · 아직 기록이 없습니다 — 첫 기록의 주인공이 되어보세요`;
+    } else {
+      el.textContent = `🌐 전체 서버 기록${via}`;
+    }
     el.className = 'rank-src ok';
   } else if(_rankSource === 'snapshot'){
     const mins = Math.max(1, Math.round((Date.now() - _rankSnapshotAt) / 60000));
