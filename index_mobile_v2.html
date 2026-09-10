@@ -959,10 +959,14 @@ function getDiffMult(){
   // 처치 시간이 길어졌다(Lv.30에서 1.94배). 즉 레벨업이 보상이 아니라
   // 페널티였고, 이것이 "성장했는데 오히려 못 깬다"의 원인이었다.
   // 이제 레벨당 적 체력 +2.5% < 플레이어 공격 +5.5% 로 뒤집는다.
+  // 적 수를 줄인 만큼 개체를 두껍게 만든다. 총 난이도는 유지하면서
+  // "한 대에 증발" 대신 "몇 대는 때려야 죽는" 손맛이 생긴다.
+  // 레벨 성분(4%)은 여전히 플레이어 공격 성장(5.5%)보다 작아 레벨업은 이득이다.
+  const BASE_TOUGHNESS = 1.9;
   const stageMult = 1 + (st - 1) * 0.16;
-  const lvMult    = 1 + (lv - 1) * 0.025;
+  const lvMult    = 1 + (lv - 1) * 0.040;
   return {
-    hp:  stageMult * lvMult,
+    hp:  BASE_TOUGHNESS * stageMult * lvMult,
     spd: Math.min(1 + (st - 1) * 0.05 + (lv - 1) * 0.008, 2.6),
     atk: (1 + (st - 1) * 0.13) * (1 + (lv - 1) * 0.020),
   };
@@ -1064,7 +1068,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -1325,8 +1329,8 @@ function updateHUD(){
     scrEl.className = gs.comboCount >= 3 ? 'combo' : '';
   }
   const stgEl = document.getElementById('stgn');
-  stgEl.textContent = isBossStage(stage) ? `${stage} ☠` : `${stage}`;
   stgEl.style.color = isBossStage(stage) ? '#ff4a28' : '';
+  if(isBossStage(stage)) stgEl.textContent = `${stage} ☠`;
   const rem = Math.max(0, Math.ceil(stageTimer));
   const rs = rem % 60, rm = Math.floor(rem / 60);
   const ctEl = document.getElementById('ctdwn');
@@ -1334,8 +1338,12 @@ function updateHUD(){
     ctEl.textContent = '보스전';
     ctEl.className = 'warn';
   } else {
+    // 남은 처치 목표를 함께 보여준다 — 타이머만 있으면 "다 잡았는데 왜 안 끝나지"가 된다
+    const left = Math.max(0, stageKillQuota(stage) - (gs.kills - stageKillsStart));
     ctEl.textContent = `${rm}:${rs<10?'0':''}${rs}`;
     ctEl.className = rem <= 10 ? 'warn' : '';
+    const q = document.getElementById('stgn');
+    if(q) q.textContent = `${stage}  남은 ${left}`;
   }
   // ── 누적 스탯 칩 ──────────────────────────────────────────────
   renderStatChips(collectStatChips(p));
@@ -2489,6 +2497,13 @@ function saveMeta(m){
 let meta = loadMeta();
 
 // 레벨에서 파생되는 영구 기본 스탯. 능력 카드(배수)와 달리 판을 넘어 유지된다.
+// 능력 카드 1장에 필요한 경험치.
+// 처치 경험치가 메타 레벨당 +8%로 불어나므로 요구량에도 같은 계수를 곱해,
+// 레벨과 무관하게 '몇 마리를 잡아야 카드 한 장'이 일정하게 유지된다.
+function runXpFor(runLevel, metaLevel){
+  return Math.round(46 * Math.pow(1.26, runLevel - 1) * (1 + (metaLevel - 1) * 0.08));
+}
+
 function metaBase(level){
   const n = level - 1;
   return {
@@ -2557,7 +2572,7 @@ function initGame(){
       // 능력 카드용 별도 트랙 — 판마다 초기화된다.
       // 메타 경험치 요구량은 레벨과 함께 폭증(1.22^n)해서, 여기에만 의존하면
       // Lv.30 이상에서는 한 판에 카드를 한 장도 못 받았다.
-      runLevel: 1, runXp: 0, runXpNext: 20,
+      runLevel: 1, runXp: 0, runXpNext: runXpFor(1, meta.level),
       radius: 20,
       // 기저 스탯 — 레벨에서 파생된 영구분이 기본값이 된다.
       // 능력 카드로 얻는 증가분은 이 위에 곱해지고, 판이 끝나면 사라진다.
@@ -2669,9 +2684,12 @@ function waveSpawn(){
   if(stage >= 8) types.push('shaman');
 
   // 스폰 수: 스테이지가 오를수록 늘되 상한을 둔다(파티클·충돌 부하 보호)
+  // 스폰 수는 스테이지에만 비례한다.
+  // 예전에는 레벨당 보너스가 붙어 Lv.30이면 스테이지 1에도 60초간 207마리가
+  // 쏟아졌다(Lv.1은 46마리). 적이 많은데 하나같이 즉사해서 손맛이 없고
+  // 화면만 시끄러웠다.
   const base = stage < 3 ? 2 : stage < 5 ? 3 : stage < 8 ? 4 : Math.min(5 + Math.floor((stage - 8) / 4), 8);
-  const lvBonus = Math.floor((lv - 1) / 4);
-  const count = Math.min(base + lvBonus, 12);
+  const count = Math.min(base, 8);
 
   // 고스테이지에서는 강한 적이 더 자주 등장하도록 가중치 적용
   for(let i=0; i<count; i++){
@@ -2880,7 +2898,7 @@ function update(dt){
     // 계속 진행되므로, 타이머는 압박 표시용으로만 쓰고 0에서 멈춘다.
     if(stageTimer < 0) stageTimer = 0;
     if(gs.boss && gs.boss.dead) stageClear();
-  } else if(stageTimer <= 0){
+  } else if(stageTimer <= 0 || (gs.kills - stageKillsStart) >= stageKillQuota(stage)){
     stageTimer = 0; stageClear(); return;
   }
   // 콤보 타이머
@@ -4489,8 +4507,8 @@ function gainXp(xp){
   let gotCard = false;
   while(p.runXp >= p.runXpNext){
     p.runXp -= p.runXpNext;
-    p.runXpNext = Math.round(p.runXpNext * 1.22);
     p.runLevel++;
+    p.runXpNext = runXpFor(p.runLevel, p.level);
     gotCard = true;
     gs.pendingLevelup = (gs.pendingLevelup || 0) + 1;
   }
@@ -4620,8 +4638,10 @@ function stageClear(){
   const stageKills = gs.kills - stageKillsStart;
 
   // 패널 업데이트
+  const early = !isBossStage(stage) && stageTimer > 0.1;
   document.getElementById('scstglbl').textContent = isBossStage(stage)
-    ? `STAGE ${stage} · 보스 격파` : `STAGE ${stage} 완료`;
+    ? `STAGE ${stage} · 보스 격파`
+    : early ? `STAGE ${stage} · 목표 달성 (${Math.ceil(stageTimer)}초 남기고)` : `STAGE ${stage} 완료`;
   document.getElementById('scscore').textContent = gs.score.toLocaleString();
   document.getElementById('sckills').textContent = stageKills;
   document.getElementById('sccombo').textContent = gs.bestCombo + '연';
@@ -4643,6 +4663,12 @@ function stageClear(){
 // 보스 스테이지는 시간이 아니라 '보스 처치'로 끝난다.
 const BOSS_EVERY = 5;
 function isBossStage(st){ return st % BOSS_EVERY === 0; }
+
+// 처치 목표 — 이 수를 채우면 제한시간을 기다리지 않고 즉시 클리어된다.
+// 예전에는 스테이지가 무조건 60초였다. 강해질수록 적을 다 쓸어놓고도
+// 타이머가 끝나기를 멍하니 기다려야 해서 판이 늘어지는 느낌이 났다.
+// 이제 잘 싸울수록 판이 빨리 끝나고, 못 싸우면 60초를 버텨야 한다.
+function stageKillQuota(st){ return 18 + st * 6; }
 
 // 보스전은 제한시간을 넉넉히 준다(사실상 처치로 종료). 일반 스테이지는 60초 고정.
 function stageDuration(st){ return isBossStage(st) ? 180 : STAGE_DURATION; }
