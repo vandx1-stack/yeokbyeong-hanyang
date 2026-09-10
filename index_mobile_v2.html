@@ -931,6 +931,58 @@ const ZOMBIE_DEFS = {
     color: '#8a1010', eyeColor: '#ff3030',
     scale: 0.9,
   },
+  // ── 스테이지 11+ : 분열 ──────────────────────────────────
+  // 죽으면 둘로 쪼개진다. 몰아서 한 번에 정리하던 습관이 통하지 않는다.
+  splitter: {
+    name: '분열 역귀',
+    hp: 95, spd: 62, atk: 14, atkRange: 30, atkCooldown: 1.3,
+    xp: 26, radius: 17,
+    knockbackRes: 0.6,
+    color: '#5a2a6a', eyeColor: '#c060ff',
+    scale: 1.2,
+    splitsInto: 'splitling', splitCount: 2,
+  },
+  splitling: {
+    name: '분열체',
+    hp: 26, spd: 108, atk: 7, atkRange: 22, atkCooldown: 0.9,
+    xp: 5, radius: 10,
+    knockbackRes: 0.25,
+    color: '#6a3a7a', eyeColor: '#d080ff',
+    scale: 0.72,
+  },
+  // ── 스테이지 14+ : 치유 ──────────────────────────────────
+  // 주변 적을 회복시킨다. 먼저 끊지 않으면 아무리 때려도 줄지 않는다.
+  healer: {
+    name: '역병 무녀',
+    hp: 90, spd: 40, atk: 10, atkRange: 30, atkCooldown: 1.8,
+    xp: 34, radius: 14,
+    knockbackRes: 0.4,
+    color: '#2a6a4a', eyeColor: '#40ffa0',
+    scale: 1.05,
+    healRadius: 130, healPerSec: 26,
+  },
+  // ── 스테이지 17+ : 돌진 ──────────────────────────────────
+  // 잠깐 멈춰 자세를 잡은 뒤 직선으로 돌진한다. 예고를 보고 피해야 한다.
+  charger: {
+    name: '돌격 역졸',
+    hp: 120, spd: 46, atk: 26, atkRange: 30, atkCooldown: 1.5,
+    xp: 32, radius: 16,
+    knockbackRes: 0.8,
+    color: '#7a3a10', eyeColor: '#ff9020',
+    scale: 1.2,
+    chargeCd: 3.4, chargeWindup: 0.75, chargeSpeed: 430, chargeTime: 0.55,
+  },
+  // ── 스테이지 20+ : 망령 ──────────────────────────────────
+  // 반투명하고 넉백이 거의 통하지 않는다. 밀어내며 버티는 전법이 막힌다.
+  phantom: {
+    name: '역병 망령',
+    hp: 140, spd: 72, atk: 24, atkRange: 28, atkCooldown: 1.2,
+    xp: 40, radius: 15,
+    knockbackRes: 0.97,
+    color: '#2a4a6a', eyeColor: '#80e0ff',
+    scale: 1.1,
+    ghost: true,
+  },
   // ── 스테이지 8+ ──────────────────────────────────────────
   shaman: {
     name: '무당 역졸',
@@ -1068,7 +1120,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '2.2.0';
+const APP_VERSION = '2.3.0';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -2631,17 +2683,21 @@ function initGame(){
 // ════════════════════════════════════════════════════════════════════
 // 스폰
 // ════════════════════════════════════════════════════════════════════
-function spawnZombie(type){
+function spawnZombie(type, atX, atY){
   const def = ZOMBIE_DEFS[type];
   const dm = getDiffMult();
-  // 화면 밖 4방향에서 랜덤 등장
+  // 화면 밖 4방향에서 랜덤 등장 (좌표를 주면 그 자리에 — 분열체 등)
   let x, y;
+  if(atX != null){
+    x = atX; y = atY;
+  } else {
   const side = Math.random()*4|0;
   const margin = 30;
   if(side===0){ x=Math.random()*MAP_W; y=-margin; }
   else if(side===1){ x=MAP_W+margin; y=Math.random()*PLAY_H; }
   else if(side===2){ x=Math.random()*MAP_W; y=PLAY_H+margin; }
   else { x=-margin; y=Math.random()*PLAY_H; }
+  }
 
   gs.zombies.push({
     type, def,
@@ -2682,6 +2738,12 @@ function waveSpawn(){
   if(stage >= 4) types.push('elite');
   if(stage >= 6) types.push('berserker');
   if(stage >= 8) types.push('shaman');
+  // 스테이지 8 이후로는 새 적이 없어 깊은 구간이 계속 똑같았다.
+  // 행동이 다른 적을 차례로 풀어 후반 난이도를 올린다.
+  if(stage >= 11) types.push('splitter');
+  if(stage >= 14) types.push('healer');
+  if(stage >= 17) types.push('charger');
+  if(stage >= 20) types.push('phantom');
 
   // 스폰 수: 스테이지가 오를수록 늘되 상한을 둔다(파티클·충돌 부하 보호)
   // 스폰 수는 스테이지에만 비례한다.
@@ -2696,7 +2758,7 @@ function waveSpawn(){
     let type;
     if(stage >= 4 && Math.random() < 0.35){
       // 강화 적 우선 등장
-      const hardTypes = types.filter(t => ['elite','berserker','shaman','tanker','exploder'].includes(t));
+      const hardTypes = types.filter(t => ['elite','berserker','shaman','tanker','exploder','splitter','healer','charger','phantom'].includes(t));
       type = hardTypes.length ? hardTypes[Math.floor(Math.random()*hardTypes.length)] : types[Math.floor(Math.random()*types.length)];
     } else {
       type = types[Math.floor(Math.random()*types.length)];
@@ -3371,6 +3433,19 @@ function killZombie(z){
     life:0.38, maxLife:0.38,
     color:'rgba(180,60,20,0.75)', lineW:2.2,
   });
+  // 분열형: 죽으면 그 자리에서 작은 개체로 쪼개진다.
+  // 몰아서 한 번에 정리하던 습관이 통하지 않게 만드는 것이 목적.
+  if(z.def.splitsInto){
+    const n = z.def.splitCount || 2;
+    for(let i=0;i<n;i++){
+      const a = (i / n) * Math.PI * 2 + Math.random();
+      spawnZombie(z.def.splitsInto,
+        z.x + Math.cos(a) * (z.radius + 6),
+        Math.max(10, Math.min(PLAY_H - 10, z.y + Math.sin(a) * (z.radius + 6))));
+      const child = gs.zombies[gs.zombies.length - 1];
+      if(child){ child.knockVx = Math.cos(a) * 150; child.knockVy = Math.sin(a) * 150; }
+    }
+  }
   meta.totalKills = (meta.totalKills || 0) + 1;
   if((meta.totalKills % 25) === 0) saveMeta(meta);   // 매 처치마다 쓰면 비싸다
   const xpGain = Math.round(z.def.xp * (1 + (gs.player.level - 1) * 0.08));
@@ -3784,6 +3859,62 @@ function updateZombies(dt){
       const fireRate = Math.min(dt * 10, 0.4);
       if(Math.random() < fireRate) spawnFireParticle(z.x, z.y);
       if(z.hp <= 0){ killZombie(z); continue; }
+    }
+
+    // ── 치유형: 주변 적을 회복시킨다 ──
+    // 먼저 끊지 않으면 때려도 체력이 줄지 않는다. 우선 처치 대상을 만든다.
+    if(z.def.healPerSec){
+      const R = z.def.healRadius || 120;
+      z._healPulse = (z._healPulse || 0) + dt;
+      for(const o of gs.zombies){
+        if(o === z || o.dead || o.hp >= o.maxHp) continue;
+        if(Math.hypot(o.x - z.x, o.y - z.y) > R) continue;
+        o.hp = Math.min(o.maxHp, o.hp + z.def.healPerSec * dt);
+      }
+      // 치유 범위 표시 (연출)
+      if(z._healPulse > 0.35){
+        z._healPulse = 0;
+        gs.particles.push({ type:'ring', x:z.x, y:z.y - z.radius*0.4, vx:0, vy:0,
+          radius:0, maxRadius:R, life:0.55, maxLife:0.55,
+          color:'rgba(80,255,150,0.45)', lineW:1.6, spikes:0 });
+      }
+    }
+
+    // ── 돌진형: 자세를 잡았다가 직선으로 튀어나간다 ──
+    // 예고 동작이 있어 보고 피할 수 있다. 가만히 있으면 크게 맞는다.
+    if(z.def.chargeSpeed){
+      z._chgCd = (z._chgCd == null) ? Math.random() * z.def.chargeCd : z._chgCd - dt;
+      if(z._chgState === 'dash'){
+        z._chgT -= dt;
+        z.x += z._chgVx * dt;
+        z.y += z._chgVy * dt;
+        z.y = Math.max(-60, Math.min(PLAY_H + 60, z.y));
+        if(Math.random() < 0.5){
+          gs.particles.push({ type:'kbdust', x:z.x, y:z.y + z.radius*0.3,
+            vx:(Math.random()-0.5)*40, vy:-6, life:0.3, maxLife:0.3, size:5+Math.random()*5 });
+        }
+        if(z._chgT <= 0){ z._chgState = null; z._chgCd = z.def.chargeCd; }
+        continue;                       // 돌진 중에는 일반 AI를 건너뛴다
+      }
+      if(z._chgState === 'windup'){
+        z._chgT -= dt;
+        if(z._chgT <= 0){
+          const a = Math.atan2(p.y - z.y, p.x - z.x);
+          z._chgVx = Math.cos(a) * z.def.chargeSpeed;
+          z._chgVy = Math.sin(a) * z.def.chargeSpeed;
+          z._chgState = 'dash'; z._chgT = z.def.chargeTime;
+        }
+        continue;                       // 준비 동작 중엔 제자리
+      }
+      const distToP = Math.hypot(p.x - z.x, p.y - z.y);
+      if(z._chgCd <= 0 && distToP < 320 && distToP > 60){
+        z._chgState = 'windup'; z._chgT = z.def.chargeWindup;
+        // 돌진 예고 — 플레이어 방향으로 붉은 쐐기
+        gs.particles.push({ type:'kbwedge', x:z.x, y:z.y - z.radius*0.5, vx:0, vy:0,
+          life:z.def.chargeWindup, maxLife:z.def.chargeWindup,
+          size:30, angle:Math.atan2(p.y - z.y, p.x - z.x), power:1 });
+        continue;
+      }
     }
 
     // 넉백 감쇄 + 밀려나는 동안 속도선
@@ -4649,8 +4780,11 @@ function stageClear(){
     ? `보스 격파 · HP 완전 회복`
     : `+${hpBonus.toLocaleString()} 체력 보너스 점수 · HP +${healAmt} 회복`;
   const nextIsBoss = isBossStage(stage + 1);
+  const newFoe = newTypeAt(stage + 1);
   document.getElementById('scwarn').textContent = nextIsBoss
     ? `☠ 스테이지 ${stage+1} — 보스 「${bossDef(stage+1).name}」 출현`
+    : newFoe
+    ? `⚠ 스테이지 ${stage+1} — 신규 적 「${newFoe}」 출현`
     : `스테이지 ${stage+1} · 적이 더 강해집니다 (Lv.${gs.player.level} 유지)`;
 
   showPanel('sc');
@@ -4663,6 +4797,17 @@ function stageClear(){
 // 보스 스테이지는 시간이 아니라 '보스 처치'로 끝난다.
 const BOSS_EVERY = 5;
 function isBossStage(st){ return st % BOSS_EVERY === 0; }
+
+// 해당 스테이지에서 처음 등장하는 적 — 클리어 화면에서 예고한다.
+// 새 적이 조용히 섞여 들어오면 플레이어는 왜 갑자기 어려워졌는지 모른다.
+const NEW_TYPE_AT = {
+  2:'runner', 3:'tanker', 4:'elite', 6:'berserker', 8:'shaman',
+  11:'splitter', 14:'healer', 17:'charger', 20:'phantom',
+};
+function newTypeAt(st){
+  const t = NEW_TYPE_AT[st];
+  return t && ZOMBIE_DEFS[t] ? ZOMBIE_DEFS[t].name : null;
+}
 
 // 처치 목표 — 이 수를 채우면 제한시간을 기다리지 않고 즉시 클리어된다.
 // 예전에는 스테이지가 무조건 60초였다. 강해질수록 적을 다 쓸어놓고도
@@ -6293,6 +6438,11 @@ function drawZombieSprite(z, flash){
     archer:    'z_archer',
     tanker:    'z_tanker',
     elite:     'z_tanker',
+    splitter:  'z_normal',
+    splitling: 'z_runner',
+    healer:    'z_archer',
+    charger:   'z_runner',
+    phantom:   'z_normal',
   };
   const spriteKey = spriteKeyMap[type] || 'z_normal';
 
@@ -6354,10 +6504,22 @@ function drawZombieSprite(z, flash){
     z_archer: 'saturate(0.20) brightness(0.42) hue-rotate(22deg)',
     z_tanker: 'hue-rotate(155deg) saturate(0.28) brightness(0.44)',
   };
+  // 같은 스프라이트를 쓰는 신규 타입은 색조로 구분한다
+  // 기본 좀비는 채도를 크게 낮춰 어둡게 깔리므로, 신규 타입은 채도를 확실히
+  // 올려 한눈에 구분되게 한다. 무엇이 위험한 적인지 즉시 읽혀야 난이도가
+  // 불합리하게 느껴지지 않는다.
+  const TYPE_FILTERS = {
+    splitter:  'hue-rotate(275deg) saturate(1.6) brightness(0.72)',
+    splitling: 'hue-rotate(275deg) saturate(1.5) brightness(0.80)',
+    healer:    'hue-rotate(115deg) saturate(1.8) brightness(0.78)',
+    charger:   'hue-rotate(340deg) saturate(1.7) brightness(0.74)',
+    phantom:   'hue-rotate(195deg) saturate(1.4) brightness(0.92)',
+  };
   ctx.save();
+  if(def.ghost) ctx.globalAlpha *= 0.55;      // 망령은 반투명
   ctx.filter = flash
     ? 'brightness(10) saturate(0)'
-    : (ZOMBIE_FILTERS[spriteKey] || 'saturate(0.25) brightness(0.45)');
+    : (TYPE_FILTERS[type] || ZOMBIE_FILTERS[spriteKey] || 'saturate(0.25) brightness(0.45)');
   drawSpriteSheet(spriteKey, sc, sr, 4, 3, 0, r * 0.6, targetH, drawNoFlip, 1, zFrameFlip === 'flip');
   ctx.restore();
 
