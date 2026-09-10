@@ -551,7 +551,7 @@ body{
     <div id="pause-stats"></div>
     <div class="pause-btns">
       <button class="tbtn" id="pause-resume-btn">계속하기</button>
-      <button class="tbtn" id="pause-home-btn">게임종료</button>
+      <button class="tbtn" id="pause-home-btn">판 종료</button>
     </div>
   </div>
 </div>
@@ -1057,7 +1057,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.0.2';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -3416,7 +3416,20 @@ function _loadLocal(){
   return JSON.parse(localStorage.getItem('hanyang_v2_rank') || '[]');
 }
 
-// 점수 제출: 개별 파일로 저장 (race condition 없음)
+// 랭킹 기록 생성 — 모든 제출 경로가 반드시 이 함수를 쓴다.
+function buildRankEntry(score, level, kills, stageNum, timeSec, weapon){
+  const mm = Math.floor(timeSec/60), ss = Math.floor(timeSec%60);
+  return {
+    name: _playerName(), score, level, kills,
+    stage: stageNum || 1,
+    time: `${mm}:${ss<10?'0':''}${ss}`,
+    weapon: weapon || 'talisman',
+    ver: 2,                       // v1 기록과 분리. 빠지면 v2 랭킹에 안 보인다.
+    ts: Date.now(),
+  };
+}
+
+// (구) 점수 제출 — 현재는 _triggerGameOver()가 직접 처리한다
 async function saveRanking(score, level, time, kills, stageNum, weapon){
   const mm=Math.floor(time/60), ss=Math.floor(time%60);
   _lastTs = Date.now();
@@ -4499,7 +4512,7 @@ function checkPlayerDeath(){
   }
 }
 
-function _triggerGameOver(){
+function _triggerGameOver(quit){
   saveMeta(meta);          // 판 종료 시 영구 성장 확정 저장
   try {
     BGM.fadeOut(1.0);
@@ -4510,12 +4523,8 @@ function _triggerGameOver(){
   const finalScore = gs.score;
 
   // 로컬 저장 + 순위 계산 (동기, 즉시)
-  _lastTs = Date.now();
-  const entry = {
-    name: _playerName(), score: finalScore, level: gs.player.level, kills: gs.kills,
-    stage: stage||1, time: `${mm}:${ss<10?'0':''}${ss}`,
-    weapon: gs.player.weapon||'talisman', ts: _lastTs
-  };
+  const entry = buildRankEntry(finalScore, gs.player.level, gs.kills, stage, gameTime, gs.player.weapon);
+  _lastTs = entry.ts;
   _saveLocal(entry);
   const localList = _loadLocal();
   const myRank = Math.max(1, localList.findIndex(r => r.ts === _lastTs) + 1);
@@ -4525,6 +4534,10 @@ function _triggerGameOver(){
   document.getElementById('gorank').textContent = myRank === 1 ? '🏆 신기록!' : `랭킹 ${myRank}위`;
   document.getElementById('gost').textContent =
     `STAGE ${stage}  ·  생존 ${mm}분 ${ss}초  ·  Lv.${gs.player.level}  ·  처치 ${gs.kills}  ·  최대콤보 ${gs.bestCombo}연`;
+  const gotEl = document.querySelector('#go .got');
+  const gosbEl = document.querySelector('#go .gosb');
+  if(gotEl)  gotEl.textContent  = quit ? '판 종료' : '전 사';
+  if(gosbEl) gosbEl.textContent = quit ? '기록을 저장했습니다' : '그대의 여정이 끝났습니다';
   showPanel('go');
   renderRankingTable(myRank);
 
@@ -4774,7 +4787,18 @@ _bindBtn('btn-cs-back', ()=>{ _csStopLoop(); goToTitle(); });
   }
   const btn = document.getElementById('pause-home-btn');
   if(!btn) return;
-  const goHome = (e) => { e.preventDefault(); e.stopPropagation(); _setPause(false); goToTitle(); };
+  const goHome = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    _setPause(false);
+    // 진행한 판이 있으면 결과 화면을 거쳐 기록을 남긴다.
+    // 곧장 타이틀로 나가면 그 판의 기록이 사라져, 플레이어는 자기 기록이
+    // 왜 랭킹에 없는지 알 수 없다.
+    if(phase === 'playing' && gs && (gs.score > 0 || gs.kills > 0)){
+      _triggerGameOver(true);
+    } else {
+      goToTitle();
+    }
+  };
   btn.addEventListener('click',    goHome);
   btn.addEventListener('touchend', goHome);
 })();
