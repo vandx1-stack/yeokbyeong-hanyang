@@ -1120,7 +1120,7 @@ const UPGRADE_POOL = UPGRADE_COMMON;
 // ════════════════════════════════════════════════════════════════════
 // 이전 빌드는 index_mobile_v1.html로 보존되어 있으며 versions.html에서 목록 확인.
 // 버그리포트에 어느 빌드인지 남길 수 있도록 타이틀 화면 좌하단에 표시한다.
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.3.1';
 (function(){
   const el = document.getElementById('ver-badge');
   if(el) el.textContent = 'v' + APP_VERSION;
@@ -2983,7 +2983,9 @@ function update(dt){
   updateDmgNumbers(dt);
   updateWave(dt);
   updateScreen(dt);
-  _updateStageAEmbers(dt);
+  // stage_a 화재 불씨는 A 배경일 때만 갱신한다 (B에서는 그리지도 않으면서 돌았다)
+  if(!stageBgIsB(stage)) _updateStageAEmbers(dt);
+  else if(_stageAEmbers.length) _stageAEmbers.length = 0;
   checkPlayerDeath();
 }
 
@@ -5918,12 +5920,31 @@ function _drawBloodStains(c){
   }
 }
 
+// 스테이지 배경 — 5스테이지(보스 주기)마다 번갈아 바뀐다.
+//   1~5 궁궐 야경(A) · 6~10 불타는 거리(B) · 11~15 A · 16~20 B ...
+// 무한 스테이지라 두 장을 순환시키고, 순환 회차마다 색보정을 달리해
+// 같은 그림이 반복돼도 구간이 바뀐 것이 느껴지게 한다.
+// 회차별 공기색. 0회차(1~10스테이지)는 원본 그대로, 이후 점점 험악해진다.
+const STAGE_GRADES = [
+  null,                        // 1~10   원본
+  'rgba(10,26,58,0.20)',       // 11~20  한기 도는 푸른 밤
+  'rgba(70,10,6,0.20)',        // 21~30  피에 젖은 붉은 밤
+  'rgba(38,8,54,0.22)',        // 31~40  역병 기운의 보랏빛
+  'rgba(12,40,26,0.20)',       // 41~50  썩은 초록 안개
+];
+function stageBgIsB(st){ return Math.floor((st - 1) / BOSS_EVERY) % 2 === 1; }
+function stageBgCycle(st){ return Math.floor((st - 1) / (BOSS_EVERY * 2)); }
+
 function drawBackground(){
   const now = performance.now()*0.001;
 
   // ── 실사 배경 이미지 (스테이지별) ──
-  const stageNum = gs ? (gs.stage || 1) : 1;
-  const bgImg = stageNum >= 6
+  // 예전에는 gs.stage 를 읽었는데 그런 속성은 어디서도 대입되지 않아
+  // 항상 undefined → stageNum 1 로 고정됐다. 그래서 배경이 절대 바뀌지 않았고
+  // stage_b 용 연출(상단 연기 등)은 통째로 죽은 코드였다.
+  const stageNum = (typeof stage !== 'undefined') ? stage : 1;
+  const useB = stageBgIsB(stageNum);
+  const bgImg = useB
     ? (SPRITES.stage_bg_b || SPRITES.palace_bg)
     : (SPRITES.stage_bg_a || SPRITES.palace_bg);
   if(bgImg){
@@ -5941,7 +5962,14 @@ function drawBackground(){
     nightG.addColorStop(0.78,'rgba(2,2,4,0.40)');
     nightG.addColorStop(1,'rgba(4,4,8,0.30)');
     ctx.fillStyle=nightG; ctx.fillRect(0,0,MAP_W,PLAY_H);
-    if(stageNum >= 6){
+    // 순환 회차별 색보정 — 배경 두 장을 돌려쓰므로, 회차가 바뀌면 공기색을
+    // 바꿔 "더 깊은 구간에 왔다"가 느껴지게 한다.
+    const grade = STAGE_GRADES[stageBgCycle(stageNum) % STAGE_GRADES.length];
+    if(grade){
+      ctx.fillStyle = grade;
+      ctx.fillRect(0, 0, MAP_W, PLAY_H);
+    }
+    if(useB){
       // stage_b 상단 연기 그라데이션
       const smokeG=ctx.createLinearGradient(0,0,0,PLAY_H*0.22);
       smokeG.addColorStop(0,'rgba(4,1,0,0.55)');
@@ -5953,7 +5981,7 @@ function drawBackground(){
   }
 
   // ── 달 / 별 (궁궐야경 stage_a만 표시, 불타는 거리는 하늘 연기로 가림) ──
-  if(stageNum < 6){
+  if(!useB){
     const moonX=MAP_W*0.82, moonY=50;
     for(let ri=3;ri>=0;ri--){
       const r=28+ri*18, a=(0.06-ri*0.015)*(Math.sin(now*0.6+ri)*0.2+0.85);
@@ -5978,7 +6006,8 @@ function drawBackground(){
   }
 
   // ── Stage A 화재·연기·불씨 이펙트 (위치는 _STAGE_A_FIRES 배열로 관리) ──
-  if(stageNum < 6 && _STAGE_A_FIRES.length > 0){
+  // 화재 위치는 stage_a 그림에 맞춰 손으로 찍은 좌표라 B 배경에서는 쓰지 않는다
+  if(!useB && _STAGE_A_FIRES.length > 0){
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for(let fi = 0; fi < _STAGE_A_FIRES.length; fi++){
